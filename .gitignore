@@ -1,0 +1,52 @@
+# --- Secrets / env ---
+.env
+.env.*
+!.env.example
+
+# --- uv ---
+.venv/
+.uv-cache/
+# Keep uv.lock committed (reproducible installs)
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+pip-wheel-metadata/
+.installed.cfg
+MANIFEST
+
+# --- Tooling caches ---
+.mypy_cache/
+.pyright/
+.pytype/
+.ruff_cache/
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# --- Editors / OS ---
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Jupyter ---
+.ipynb_checkpoints/
