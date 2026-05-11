@@ -10,11 +10,11 @@ def get_session_path(user_id):
 
 
 def load_session(user_id):
-    """load conversation from history from disk"""
+    """Load conversation history from disk."""
     path = get_session_path(user_id)
     messages = []
     if os.path.exists(path):
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     messages.append(json.loads(line))
@@ -24,12 +24,22 @@ def load_session(user_id):
 def append_to_session(user_id, message):
     """Append a single message to the session file."""
     path = get_session_path(user_id)
-    with open(path, "a") as f:
+    with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(message) + "\n")
 
 
 def save_session(user_id, messages):
-    """overwrite the session file with full messages list"""
+    """Overwrite the session file with the full messages list."""
     path = get_session_path(user_id)
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.writelines(json.dumps(message) + "\n" for message in messages)
+
+
+def clean_for_input(items):
+    """Strip output-only fields (e.g. `status`) before sending items to the Responses API."""
+    cleaned = []
+    for it in items:
+        if isinstance(it, dict):
+            it = {k: v for k, v in it.items() if k != "status"}
+        cleaned.append(it)
+    return cleaned
