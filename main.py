@@ -1,7 +1,9 @@
 import json
 import os
+import threading
 
 from dotenv import load_dotenv
+from flask import Flask, jsonify, request
 from openai import AzureOpenAI
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters
@@ -33,7 +35,9 @@ def run_agent_turn(input_items, system_prompt):
             max_output_tokens=4096,
             instructions=system_prompt,
             tools=TOOLS,
-            input=clean_for_input(input_items),  # strip output-only fields like 'status'
+            input=clean_for_input(
+                input_items
+            ),  # strip output-only fields like 'status'
         )
 
         # Append everything the model emitted (text + tool calls) back into history.
@@ -83,6 +87,24 @@ async def handle_message(update: Update, context):
 
     save_session(user_id, messages)
     await update.message.reply_text(response_text)
+
+
+flask_app = Flask(__name__)
+
+
+@flask_app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json
+    user_id = data["user_id"]
+    messages = load_session(user_id)
+    messages.append({"role": "user", "content": data["message"]})
+    response_text, messages = run_agent_turn(messages, SOUL)
+
+    save_session(user_id, messages)
+    return jsonify({"response": response_text})
+
+
+threading.Thread(target=lambda: flask_app.run(port=5000), daemon=True).start()
 
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
