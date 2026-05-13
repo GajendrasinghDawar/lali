@@ -2,6 +2,8 @@ import subprocess
 
 from openai.types.responses import FunctionToolParam
 
+from permissions import check_command_safety
+
 TOOLS: list[FunctionToolParam] = [
     {
         "type": "function",
@@ -65,6 +67,11 @@ TOOLS: list[FunctionToolParam] = [
 
 def execute_tool(name: str, args: dict) -> str:
     if name == "run_command":
+        cmd = args["command"]
+        safety = check_command_safety(cmd)
+        if safety == 'needs_approval':
+            print(f'blocked: {cmd} needs approvals')
+            return 'Permission denied. Command requires approval.'
         result = subprocess.run(
             args["command"],
             shell=True,
