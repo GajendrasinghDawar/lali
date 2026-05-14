@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+from collections import defaultdict
 
 from flask import Flask, jsonify, request
 from telegram import Update
@@ -57,6 +58,9 @@ def run_agent_turn(input_items, system_prompt):
             )
 
 
+session_locks = defaultdict(threading.Lock)
+
+
 async def handle_message(update: Update, context):
     if (
         update.message is None
@@ -66,18 +70,19 @@ async def handle_message(update: Update, context):
         return
 
     user_id = str(update.effective_user.id)
-    user_message = update.message.text
+    with session_locks[user_id]:
+        user_message = update.message.text
 
-    messages = load_session(user_id)
-    messages = compact_session(user_id, messages)
+        messages = load_session(user_id)
+        messages = compact_session(user_id, messages)
 
-    user_msg = {"role": "user", "content": user_message}
-    messages.append(user_msg)
-    append_to_session(user_id, user_msg)
+        user_msg = {"role": "user", "content": user_message}
+        messages.append(user_msg)
+        append_to_session(user_id, user_msg)
 
-    response_text, messages = run_agent_turn(messages, SOUL)
+        response_text, messages = run_agent_turn(messages, SOUL)
 
-    save_session(user_id, messages)
+        save_session(user_id, messages)
     await update.message.reply_text(response_text)
 
 
@@ -88,11 +93,14 @@ flask_app = Flask(__name__)
 def chat():
     data = request.json
     user_id = data["user_id"]
-    messages = load_session(user_id)
-    messages.append({"role": "user", "content": data["message"]})
-    response_text, messages = run_agent_turn(messages, SOUL)
+    with session_locks[user_id]:
+        messages = load_session(user_id)
+        messages = compact_session(user_id, messages)
+        messages.append({"role": "user", "content": data["message"]})
 
-    save_session(user_id, messages)
+        response_text, messages = run_agent_turn(messages, SOUL)
+
+        save_session(user_id, messages)
     return jsonify({"response": response_text})
 
 
