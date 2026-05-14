@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 sessions/
+memory/
+
 # --- uv ---
 .venv/
 .uv-cache/
