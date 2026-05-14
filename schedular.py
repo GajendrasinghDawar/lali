@@ -34,8 +34,8 @@ def setup_heartbeats():
         print(f"[bot] {response_text}\n")
         # In production, you'd send this to Telegram/Discord too
 
-    # schedule.every().day.at("07:30").do(morning_briefing)
-    schedule.every(1).minutes.do(morning_briefing)
+    schedule.every().day.at("07:30").do(morning_briefing)
+    # schedule.every(1).minutes.do(morning_briefing)
 
     # Run the scheduler in a background thread
     def scheduler_loop():

@@ -9,6 +9,7 @@ from telegram.ext import Application, MessageHandler, filters
 from agent import run_agent_turn
 from compaction import compact_session
 from contants import SOUL
+from multi_agent import AGENTS, resolve_agent
 from schedular import setup_heartbeats
 from utils import (
     append_to_session,
@@ -28,8 +29,12 @@ async def handle_message(update: Update, context):
         return
 
     user_id = str(update.effective_user.id)
-    with session_locks[user_id]:
-        user_message = update.message.text
+    agent_id, message_text = resolve_agent(update.message.text)
+    agent = AGENTS[agent_id]
+    session_key = f"{agent['session_prefix']}:{user_id}"
+
+    with session_locks[session_key]:
+        user_message = message_text
 
         messages = load_session(user_id)
         messages = compact_session(user_id, messages)

@@ -6,7 +6,7 @@ AGENTS = {
         "soul": SOUL,  # our existing SOUL
         "session_prefix": "agent:main",
     },
-    "researcher": {
+    "research": {
         "name": "dhaniya",
         "soul": """You are Scout, a research specialist.
 Your job: find information and cite sources. Every claim needs evidence.
