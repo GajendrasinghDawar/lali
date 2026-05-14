@@ -9,4 +9,5 @@ dependencies = [
     "openai>=2.36.0",
     "python-dotenv>=1.2.2",
     "python-telegram-bot>=22.7",
+    "schedule>=1.2.2",
 ]

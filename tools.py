@@ -120,6 +120,7 @@ def execute_tool(name: str, args: dict) -> str:
             capture_output=True,
             text=True,
             timeout=30,
+            stdin=subprocess.DEVNULL,  # prevent hangs on commands that read stdin (e.g. Windows `date`)
         )
         return f"exit={result.returncode}\n{result.stdout}{result.stderr}"
 
