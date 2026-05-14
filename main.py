@@ -2,12 +2,12 @@ import json
 import os
 import threading
 
-from dotenv import load_dotenv
 from flask import Flask, jsonify, request
-from openai import AzureOpenAI
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters
 
+from ai_client import client
+from compaction import compact_session
 from contants import SOUL
 from tools import TOOLS, execute_tool, serialize_output
 from utils import (
@@ -15,15 +15,6 @@ from utils import (
     clean_for_input,
     load_session,
     save_session,
-)
-
-load_dotenv()
-
-
-client = AzureOpenAI(
-    api_key=os.getenv("AZURE_API_KEY"),
-    azure_endpoint="https://lasttry-openai-azure.cognitiveservices.azure.com",
-    api_version="2025-04-01-preview",
 )
 
 
@@ -78,6 +69,7 @@ async def handle_message(update: Update, context):
     user_message = update.message.text
 
     messages = load_session(user_id)
+    messages = compact_session(user_id, messages)
 
     user_msg = {"role": "user", "content": user_message}
     messages.append(user_msg)
