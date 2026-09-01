@@ -1,0 +1,45 @@
+{
+  "name": "lali",
+  "version": "1.0.0",
+  "description": "A personal AI assistant agent you talk to over Telegram. Runs on a server, accepts commands, reads and writes files, remembers things across\r sessions, and checks in on you with scheduled briefings.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev:agent": "tsx src/agent/server.ts",
+    "dev:gateway": "tsx src/gateway/server.ts",
+    "dev": "concurrently \"npm run dev:agent\" \"npm run dev:gateway\"",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GajendrasinghDawar/lali.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/GajendrasinghDawar/lali/issues"
+  },
+  "homepage": "https://github.com/GajendrasinghDawar/lali#readme",
+  "dependencies": {
+    "@types/node": "^26.4.0",
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "uuid": "^14.0.2",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.6",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^10.0.5",
+    "vitest": "^4.1.11"
+  }
+}

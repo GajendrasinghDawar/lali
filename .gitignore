@@ -52,3 +52,9 @@ Thumbs.db
 
 # --- Jupyter ---
 .ipynb_checkpoints/
+
+.agents/*node_modules/  
+gateway.db  
+dist/ 
+
+node_modules/*

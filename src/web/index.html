@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lali Web Client</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
+    #chat { border: 1px solid #ccc; padding: 1rem; height: 300px; overflow-y: auto; margin-bottom: 1rem; }
+    .message { margin-bottom: 0.5rem; }
+    .user { font-weight: bold; color: blue; }
+    .agent { font-weight: bold; color: green; }
+    .lifecycle { color: gray; font-size: 0.8em; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Lali</h1>
+  <div id="chat"></div>
+  <form id="form">
+    <input type="text" id="input" style="width: 80%;" placeholder="Type a message..." required />
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const chat = document.getElementById('chat');
+
+    function appendMessage(sender, text, className) {
+      const div = document.createElement('div');
+      div.className = `message ${className}`;
+      div.innerHTML = `<span class="${className}">${sender}:</span> <span class="content">${text}</span>`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div.querySelector('.content');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = input.value;
+      input.value = '';
+
+      appendMessage('You', message, 'user');
+      
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        
+        let agentContentSpan = appendMessage('Agent', '', 'agent');
+        let currentStatusSpan = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.substring(6));
+              
+              if (data.type === 'lifecycle') {
+                if (!currentStatusSpan) {
+                  currentStatusSpan = document.createElement('div');
+                  currentStatusSpan.className = 'lifecycle';
+                  agentContentSpan.parentNode.appendChild(currentStatusSpan);
+                }
+                currentStatusSpan.innerText = `Lifecycle: ${data.event}`;
+              } else if (data.type === 'text') {
+                agentContentSpan.innerText += data.text;
+                chat.scrollTop = chat.scrollHeight;
+              } else if (data.type === 'done') {
+                if (currentStatusSpan) currentStatusSpan.innerText = 'Completed.';
+              } else if (data.type === 'error') {
+                agentContentSpan.innerText += ` [Error: ${data.error}]`;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching stream', err);
+      }
+    });
+  </script>
+</body>
+</html>
