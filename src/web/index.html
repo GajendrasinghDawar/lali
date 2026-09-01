@@ -17,9 +17,8 @@
 <body>
   <div class="controls">
     <h1>Lali</h1>
-    <div>
-      <button onclick="logout()">Logout</button>
-      <button onclick="logoutAll()">Revoke All</button>
+    <div id="auth-controls">
+      <button onclick="loginGitHub()">Login with GitHub</button>
     </div>
   </div>
   
@@ -33,23 +32,49 @@
     const form = document.getElementById('form');
     const input = document.getElementById('input');
     const chat = document.getElementById('chat');
+    const authControls = document.getElementById('auth-controls');
 
     let csrfToken = '';
     async function init() {
+      try {
+        const sessionRes = await fetch('/api/auth/get-session');
+        const sessionData = await sessionRes.json();
+        
+        if (sessionData && sessionData.session) {
+          authControls.innerHTML = `
+            <span>Logged in</span>
+            <button onclick="logout()">Logout</button>
+            <button onclick="logoutAll()">Revoke All</button>
+          `;
+        }
+      } catch (err) {
+        console.error('Not logged in', err);
+      }
+
       const res = await fetch('/csrf-token');
       const data = await res.json();
       csrfToken = data.csrfToken;
     }
     init();
 
+    async function loginGitHub() {
+      const res = await fetch("/api/auth/sign-in/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "github", callbackURL: "/" })
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    }
+
     async function logout() {
-      await fetch('/logout', { method: 'POST', headers: { 'x-csrf-token': csrfToken } });
+      await fetch('/api/auth/sign-out', { method: 'POST' });
       window.location.reload();
     }
 
     async function logoutAll() {
-      await fetch('/logout/all', { method: 'POST', headers: { 'x-csrf-token': csrfToken } });
-      window.location.reload();
+      await fetch('/api/auth/revoke-other-sessions', { method: 'POST' });
+      await logout();
     }
 
     function appendMessage(sender, text, className) {

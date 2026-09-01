@@ -1,22 +1,32 @@
-import crypto from "crypto";
-import { Request, Response, NextFunction } from "express";
+import { betterAuth } from "better-auth";
+import Database from "better-sqlite3";
+import dotenv from "dotenv";
 
-export function generatePKCE() {
-  const verifier = crypto.randomBytes(32).toString("base64url");
-  const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
-  return { verifier, challenge };
-}
+dotenv.config();
 
-export function generateState() {
-  return crypto.randomBytes(16).toString("base64url");
-}
+export const db = new Database("gateway.db");
 
-export function sendError(res: Response, status: number, errorCode: string, message: string, retryable: boolean = false) {
-  const correlationId = res.locals.correlationId || crypto.randomUUID();
-  res.status(status).json({
-    code: errorCode,
-    message,
-    retryable,
-    correlationId,
-  });
-}
+export const auth = betterAuth({
+  database: db,
+  socialProviders: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID || "unset",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || "unset",
+    }
+  },
+  databaseHooks: {
+    account: {
+      create: {
+        before: async (account) => {
+          if (account.providerId === "github" && account.accountId !== process.env.OWNER_GITHUB_ID) {
+            throw new Error("Only the owner can log in");
+          }
+          return { data: account };
+        }
+      }
+    }
+  },
+  advanced: {
+    useSecureCookies: process.env.NODE_ENV === "production"
+  }
+});
