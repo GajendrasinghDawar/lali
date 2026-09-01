@@ -2,12 +2,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import * as net from "net";
-import * as os from "os";
 import path from "path";
 import crypto from "crypto";
-import { AgentEventSchema } from "../shared/protocol";
-
 import cookieParser from "cookie-parser";
 import { doubleCsrf } from "csrf-csrf";
 import rateLimit from "express-rate-limit";
@@ -15,21 +11,14 @@ import helmet from "helmet";
 
 import { auth, db } from "./auth";
 import { toNodeHandler } from "better-auth/node";
+import { QueueManager, sseEmitters } from "./queue";
 
 const app = express();
 app.use(helmet());
 app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser(process.env.COOKIE_SECRET || "lali-secret"));
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS requests (
-    id TEXT PRIMARY KEY,
-    message TEXT NOT NULL,
-    status TEXT NOT NULL
-  )
-`);
-
-app.all("/api/auth/*", toNodeHandler(auth));
+app.use("/api/auth", toNodeHandler(auth));
 
 // @ts-ignore
 const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
@@ -61,6 +50,7 @@ app.use(async (req, res, next) => {
     if (!session) {
       return res.status(401).json({ error: "ERR_UNAUTH", message: "Authentication required" });
     }
+    res.locals.userId = session.user.id;
     next();
   } catch (err) {
     return res.status(500).json({ error: "ERR_AUTH", message: "Auth check failed" });
@@ -73,88 +63,68 @@ app.get("/csrf-token", (req, res) => {
 
 app.use(express.static(path.join(__dirname, "../web")));
 
-const SOCKET_PATH = os.platform() === "win32" ? "\\\\.\\pipe\\lali-agent" : "/tmp/lali-agent.sock";
-let agentSocket: net.Socket | null = null;
-const responseEmitters = new Map<string, (event: any) => void>();
+app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
+  const { message, sessionId, idempotencyKey } = req.body;
+  if (!message || !sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "Message and sessionId required" });
 
-function getAgentSocket(): Promise<net.Socket> {
-  return new Promise((resolve, reject) => {
-    if (agentSocket && !agentSocket.destroyed) {
-      return resolve(agentSocket);
-    }
+  const request = QueueManager.submitRequest(sessionId, message, idempotencyKey);
+  res.status(202).json({ requestId: request.id, status: request.status });
+});
 
-    const socket = net.createConnection(SOCKET_PATH);
-    let buffer = "";
+app.post("/chat/interrupt", doubleCsrfProtection, apiLimiter, (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
+  
+  QueueManager.interruptSession(sessionId);
+  res.json({ success: true });
+});
 
-    socket.on("connect", () => {
-      agentSocket = socket;
-      resolve(socket);
-    });
+app.post("/chat/resume", doubleCsrfProtection, apiLimiter, (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
+  
+  QueueManager.resumeSession(sessionId);
+  res.json({ success: true });
+});
 
-    socket.on("data", (data) => {
-      buffer += data.toString();
-      const parts = buffer.split("\n");
-      buffer = parts.pop() || "";
+app.post("/chat/clear", doubleCsrfProtection, apiLimiter, (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
+  
+  QueueManager.clearSession(sessionId);
+  res.json({ success: true });
+});
 
-      for (const msg of parts) {
-        if (!msg.trim()) continue;
-        try {
-          const event = AgentEventSchema.parse(JSON.parse(msg));
-          const emitter = responseEmitters.get(event.requestId);
-          if (emitter) emitter(event);
-        } catch (e) {
-          console.error("Failed to parse agent event:", e);
-        }
-      }
-    });
-
-    socket.on("error", (err) => {
-      console.error("Agent socket error:", err);
-      agentSocket = null;
-      reject(err);
-    });
-
-    socket.on("close", () => {
-      agentSocket = null;
-    });
-  });
-}
-
-app.post("/chat", doubleCsrfProtection, apiLimiter, async (req, res) => {
-  const { message } = req.body;
-  if (!message) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "Message required" });
-
-  const requestId = crypto.randomUUID();
-  const stmt = db.prepare("INSERT INTO requests (id, message, status) VALUES (?, ?, ?)");
-  stmt.run(requestId, message, "accepted");
+app.get("/chat/events", apiLimiter, (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  const after = parseInt(req.query.after as string || "0", 10);
+  if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  try {
-    const socket = await getAgentSocket();
-    
-    responseEmitters.set(requestId, (event) => {
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
-      
-      if (event.type === "done" || event.type === "error") {
-        const updateStmt = db.prepare("UPDATE requests SET status = ? WHERE id = ?");
-        updateStmt.run(event.type === "done" ? "completed" : "failed", requestId);
-        responseEmitters.delete(requestId);
-        res.end();
-      }
-    });
-
-    socket.write(JSON.stringify({ requestId, message }) + "\n");
-  } catch (error) {
-    console.error("Failed to communicate with agent:", error);
-    res.write(`data: ${JSON.stringify({ type: "error", error: "Agent connection failed" })}\n\n`);
-    res.end();
+  // Send missed events
+  const pastEvents = QueueManager.getEventsAfter(sessionId, after);
+  for (const ev of pastEvents) {
+    res.write(`data: ${JSON.stringify(ev)}\n\n`);
   }
+
+  // Subscribe to new events
+  sseEmitters.set(sessionId, (event) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  });
+
+  req.on("close", () => {
+    sseEmitters.delete(sessionId);
+  });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Gateway listening on port ${PORT}`);
-});
+export { app, db };
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Gateway listening on port ${PORT}`);
+  });
+}
