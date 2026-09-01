@@ -61,8 +61,10 @@ function getAgentSocket(): Promise<net.Socket> {
         if (!msg.trim()) continue;
         try {
           const event = AgentEventSchema.parse(JSON.parse(msg));
-          const emitter = responseEmitters.get(event.requestId);
-          if (emitter) emitter(event);
+          if (event.requestId) {
+            const emitter = responseEmitters.get(event.requestId);
+            if (emitter) emitter(event);
+          }
         } catch (e) {
           console.error("Failed to parse agent event:", e);
         }
@@ -189,7 +191,7 @@ export class QueueManager {
         }
       });
 
-      socket.write(JSON.stringify({ requestId: next.id, message: next.message }) + "\\n");
+      socket.write(JSON.stringify({ version: 1, requestId: next.id, message: next.message }) + "\n");
     } catch (err) {
       db.prepare("UPDATE requests SET status = 'failed' WHERE id = ?").run(next.id);
       QueueManager.appendEvent(sessionId, next.id, "error", { error: "Agent connection failed" });

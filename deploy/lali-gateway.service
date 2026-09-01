@@ -1,0 +1,16 @@
+[Unit]
+Description=Lali Gateway Service
+After=network.target
+
+[Service]
+Type=simple
+User=lali_gateway
+Group=lali
+EnvironmentFile=/etc/lali/gateway.env
+WorkingDirectory=/opt/lali
+ExecStart=/usr/bin/npm run start:gateway
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

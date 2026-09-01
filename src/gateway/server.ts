@@ -40,9 +40,22 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/health", (req, res) => {
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.OWNER_GITHUB_ID || !process.env.BETTER_AUTH_SECRET) {
+    return res.status(503).json({ status: "error", message: "Missing auth configuration" });
+  }
+  try {
+    db.prepare("SELECT 1 FROM requests LIMIT 1").get();
+    res.json({ status: "ok" });
+  } catch (err) {
+    res.status(503).json({ status: "error", message: "Database not ready" });
+  }
+});
+
 app.use(async (req, res, next) => {
   if (req.path === "/") return next();
   if (req.path === "/csrf-token") return next();
+  if (req.path === "/health") return next();
   if (req.path.startsWith("/api/auth")) return next();
 
   try {

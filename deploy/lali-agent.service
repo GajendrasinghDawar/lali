@@ -1,0 +1,21 @@
+[Unit]
+Description=Lali Agent Service
+After=network.target
+
+[Service]
+Type=simple
+User=lali
+Group=lali
+EnvironmentFile=/etc/lali/agent.env
+WorkingDirectory=/opt/lali
+ExecStart=/usr/bin/npm run start:agent
+Restart=on-failure
+RestartSec=5s
+
+# Unprivileged constraints
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

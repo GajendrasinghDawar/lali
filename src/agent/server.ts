@@ -19,7 +19,17 @@ const server = net.createServer((socket) => {
       if (!msg.trim()) continue;
 
       try {
-        const req = AgentRequestSchema.parse(JSON.parse(msg));
+        const parsed = JSON.parse(msg);
+        const reqResult = AgentRequestSchema.safeParse(parsed);
+        
+        if (!reqResult.success) {
+          console.error("Protocol error:", reqResult.error);
+          const reqId = parsed.requestId || "unknown";
+          socket.write(JSON.stringify({ type: "error", error: "Incompatible protocol version or invalid format", requestId: reqId }) + "\n");
+          continue;
+        }
+        
+        const req = reqResult.data;
 
         const textListener = (text: string) => {
           socket.write(JSON.stringify({ type: "text", text, requestId: req.requestId }) + "\n");
@@ -52,6 +62,15 @@ const server = net.createServer((socket) => {
 });
 
 server.listen(SOCKET_PATH, () => {
+  if (os.platform() !== "win32") {
+    try {
+      // Allow user (lali) and group (lali) read/write
+      const fs = require("fs");
+      fs.chmodSync(SOCKET_PATH, 0o660);
+    } catch (e) {
+      console.warn("Could not set socket permissions:", e);
+    }
+  }
   console.log(`Agent listening on ${SOCKET_PATH}`);
 });
 
