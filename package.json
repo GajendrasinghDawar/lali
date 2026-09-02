@@ -9,8 +9,8 @@
   "scripts": {
     "start:agent": "node --permission --allow-fs-read=* --allow-fs-write=* --experimental-strip-types src/agent/server.ts",
     "start:gateway": "node --permission --allow-fs-read=* --allow-fs-write=* --experimental-strip-types src/gateway/server.ts",
-    "dev:agent": "node --experimental-strip-types src/agent/server.ts",
-    "dev:gateway": "node --experimental-strip-types src/gateway/server.ts",
+    "dev:agent": "node --watch --experimental-strip-types src/agent/server.ts",
+    "dev:gateway": "node --watch --experimental-strip-types src/gateway/server.ts",
     "dev": "concurrently \"npm run dev:agent\" \"npm run dev:gateway\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --fileParallelism false"

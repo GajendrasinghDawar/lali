@@ -54,6 +54,7 @@
   </form>
 
   <script>
+    const sessionId = "main";
     const form = document.getElementById('form');
     const input = document.getElementById('input');
     const chat = document.getElementById('chat');
@@ -193,9 +194,6 @@
       chat.scrollTop = chat.scrollHeight;
       return div.querySelector('.content');
     }
-
-    const sessionId = crypto.randomUUID();
-
     const fileInput = document.getElementById('fileInput');
     const filePreview = document.getElementById('filePreview');
     let selectedFiles = [];
