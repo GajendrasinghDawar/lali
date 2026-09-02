@@ -264,6 +264,21 @@ app.use("/api/github", doubleCsrfProtection, apiLimiter, async (req, res) => {
   }
 });
 
+
+app.post("/api/jobs", doubleCsrfProtection, apiLimiter, (req, res) => {
+  try {
+    QueueManager.assertSessionOwner("main", res.locals.userId);
+    const { summary, intervalMs } = req.body;
+    if (!summary || !intervalMs) return res.status(400).json({ error: "summary and intervalMs required" });
+    
+    const id = ScheduledJobsManager.createJob(summary, parseInt(intervalMs, 10));
+    res.json({ success: true, id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
+  }
+});
+
 app.post("/api/workspaces/clone", doubleCsrfProtection, apiLimiter, async (req, res) => {
   try {
     QueueManager.assertSessionOwner("main", res.locals.userId);
@@ -438,11 +453,13 @@ export { app, db };
 
 import url from "node:url";
 import { initTelegram } from "./telegram.ts";
+import { ScheduledJobsManager } from "./scheduled_jobs.ts";
 
 if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
   const PORT = parseInt(process.env.PORT || "3000", 10);
   app.listen(PORT, "127.0.0.1", () => {
     console.log(`Gateway listening on 127.0.0.1:${PORT}`);
     initTelegram();
+    ScheduledJobsManager.start();
   });
 }
