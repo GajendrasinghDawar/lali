@@ -23,19 +23,19 @@ export function startupCleanup() {
 }
 
 export function runRetentionPruning() {
-  db.exec("BEGIN");
-  try {
-    // Keep last 30 days of completed/failed requests and their events/effects
-    // Delete old events whose requests are old and terminal
-    db.prepare("DELETE FROM events WHERE requestId IN (SELECT id FROM requests WHERE status IN ('completed', 'failed', 'interrupted') AND created_at < datetime('now', '-30 days'))").run();
-    db.prepare("DELETE FROM requests WHERE status IN ('completed', 'failed', 'interrupted') AND created_at < datetime('now', '-30 days')").run();
-    db.prepare("DELETE FROM effects WHERE status != 'pending' AND created_at < datetime('now', '-30 days')").run();
-    db.prepare("DELETE FROM notifications WHERE created_at < datetime('now', '-30 days')").run();
-    db.prepare("DELETE FROM inbound_emails WHERE created_at < datetime('now', '-30 days')").run();
-    db.exec("COMMIT");
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
+  const queries = [
+    "DELETE FROM events WHERE requestId IN (SELECT id FROM requests WHERE status IN ('completed', 'failed', 'interrupted') AND created_at < datetime('now', '-30 days'))",
+    "DELETE FROM requests WHERE status IN ('completed', 'failed', 'interrupted') AND created_at < datetime('now', '-30 days')",
+    "DELETE FROM effects WHERE status != 'pending' AND created_at < datetime('now', '-30 days')",
+    "DELETE FROM notifications WHERE created_at < datetime('now', '-30 days')",
+    "DELETE FROM inbound_emails WHERE created_at < datetime('now', '-30 days')",
+  ];
+  for (const sql of queries) {
+    try {
+      db.prepare(sql).run();
+    } catch (_e) {
+      // Table or column may not exist in pre-migration databases; skip silently
+    }
   }
 }
 
