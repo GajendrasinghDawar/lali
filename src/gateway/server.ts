@@ -453,10 +453,15 @@ export { app, db };
 
 import url from "node:url";
 import { initTelegram } from "./telegram.ts";
+import { runMigrations } from "./schema.ts";
+import { startupCleanup, startRetentionCron } from "./startup_cleanup.ts";
 import { ScheduledJobsManager } from "./scheduled_jobs.ts";
 
 if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-  const PORT = parseInt(process.env.PORT || "3000", 10);
+  runMigrations();
+    startupCleanup();
+    startRetentionCron();
+    const PORT = parseInt(process.env.PORT || "3000", 10);
   app.listen(PORT, "127.0.0.1", () => {
     console.log(`Gateway listening on 127.0.0.1:${PORT}`);
     initTelegram();
