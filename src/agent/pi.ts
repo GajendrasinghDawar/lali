@@ -4,10 +4,10 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 
 try { process.loadEnvFile(); } catch (_e) {}
 
-const AZURE_BASE_URL = process.env.AZURE_OPENAI_BASE_URL || "https://princ-msg6fgey-southeastasia.services.ai.azure.com";
-const AZURE_API_KEY = process.env.AZURE_OPENAI_API_KEY || "";
-const AZURE_API_VERSION = process.env.AZURE_OPENAI_API_VERSION || "2025-04-01-preview";
-const AZURE_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini";
+const AZURE_BASE_URL = (process.env.AZURE_OPENAI_BASE_URL || "https://princ-msg6fgey-southeastasia.services.ai.azure.com").trim();
+const AZURE_API_KEY = (process.env.AZURE_OPENAI_API_KEY || "").trim();
+const AZURE_API_VERSION = (process.env.AZURE_OPENAI_API_VERSION || "2025-04-01-preview").trim();
+const AZURE_DEPLOYMENT = (process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini").trim().replace(/^"|"$/g, '');
 
 const SYSTEM_PROMPT = `You are Lali, a helpful personal AI assistant. You are direct, concise, and helpful.
 When the user asks you to do something that requires an external action (sending email, publishing code, transferring funds), describe what you would do but do not pretend to execute it.

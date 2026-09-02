@@ -359,9 +359,9 @@
       };
 
       sse.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (handlers[data.type]) {
-          handlers[data.type](data);
+        const payload = JSON.parse(event.data);
+        if (handlers[payload.type]) {
+          handlers[payload.type](payload.data || payload);
         }
       };
     }

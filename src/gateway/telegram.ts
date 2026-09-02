@@ -7,11 +7,12 @@ import { EmailManager } from "./email.ts";
 
 const MAX_TELEGRAM_LENGTH = 4000;
 
-function getConfig() {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const ownerId = process.env.TELEGRAM_OWNER_ID;
+export function getConfig() {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  const ownerIdString = (process.env.TELEGRAM_OWNER_ID || "").trim();
+  const ownerId = parseInt(ownerIdString, 10);
   if (!token || !ownerId) return null;
-  return { token, ownerId: parseInt(ownerId, 10), ownerIdString: ownerId };
+  return { token, ownerId, ownerIdString };
 }
 
 export function initTelegram() {
