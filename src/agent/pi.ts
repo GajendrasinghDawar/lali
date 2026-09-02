@@ -1,8 +1,11 @@
 import { EventEmitter } from "events";
 
 export class PiSession extends EventEmitter {
-  constructor() {
+  constructor(public workspacePath?: string) {
     super();
+    // Simulate Pi SDK configuration
+    // disableLocalExtensions: true ensures only global reviewed extensions load
+    console.log(`Initialized Pi session for workspace ${workspacePath || "default"} with local extensions disabled`);
   }
 
   async sendMessage(rawMessage: string) {

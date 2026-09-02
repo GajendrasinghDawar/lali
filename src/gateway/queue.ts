@@ -35,9 +35,21 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS session_state (
     sessionId TEXT PRIMARY KEY,
     userId TEXT NOT NULL,
-    is_paused BOOLEAN DEFAULT 0
+    is_paused BOOLEAN DEFAULT 0,
+    title TEXT,
+    type TEXT NOT NULL DEFAULT 'project',
+    status TEXT NOT NULL DEFAULT 'active',
+    workspaceName TEXT,
+    workspacePath TEXT
   );
 `);
+
+// Migrations for existing DBs
+try { db.exec("ALTER TABLE session_state ADD COLUMN title TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE session_state ADD COLUMN type TEXT NOT NULL DEFAULT 'project';"); } catch(e) {}
+try { db.exec("ALTER TABLE session_state ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"); } catch(e) {}
+try { db.exec("ALTER TABLE session_state ADD COLUMN workspaceName TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE session_state ADD COLUMN workspacePath TEXT;"); } catch(e) {}
 
 // Reset interrupted state on startup
 db.exec(`UPDATE requests SET status = 'interrupted' WHERE status = 'running'`);
@@ -109,7 +121,12 @@ export class QueueManager {
 
     if (session && session.userId !== userId) throw new Error("Unauthorized session access");
     if (!session) {
-      db.prepare("INSERT INTO session_state (sessionId, userId) VALUES (?, ?)").run(sessionId, userId);
+      if (sessionId === "main") {
+        const wsPath = process.env.LALI_ASSISTANT_WORKSPACE || process.cwd();
+        db.prepare("INSERT INTO session_state (sessionId, userId, type, title, workspaceName, workspacePath) VALUES (?, ?, 'main', 'Main Session', 'assistant', ?)").run(sessionId, userId, wsPath);
+      } else {
+        db.prepare("INSERT INTO session_state (sessionId, userId) VALUES (?, ?)").run(sessionId, userId);
+      }
     }
   }
 
@@ -185,6 +202,32 @@ export class QueueManager {
     db.prepare("DELETE FROM requests WHERE sessionId = ? AND status IN ('queued', 'paused_for_confirmation')").run(sessionId);
   }
 
+  static async resetSession(sessionId: string) {
+    QueueManager.clearSession(sessionId);
+    // Send reset command to agent
+    try {
+      const socket = await getAgentSocket();
+      socket.write(JSON.stringify({ version: PROTOCOL_VERSION, requestId: crypto.randomUUID(), sessionId, command: "reset", message: "" }) + "\n");
+    } catch (e) {
+      console.error("Failed to send reset to agent", e);
+    }
+  }
+
+  static async deleteSession(sessionId: string) {
+    QueueManager.interruptSession(sessionId);
+    db.prepare("DELETE FROM session_state WHERE sessionId = ?").run(sessionId);
+    db.prepare("DELETE FROM requests WHERE sessionId = ?").run(sessionId);
+    db.prepare("DELETE FROM events WHERE sessionId = ?").run(sessionId);
+    
+    // Send delete command to agent
+    try {
+      const socket = await getAgentSocket();
+      socket.write(JSON.stringify({ version: PROTOCOL_VERSION, requestId: crypto.randomUUID(), sessionId, command: "delete", message: "" }) + "\n");
+    } catch (e) {
+      console.error("Failed to send delete to agent", e);
+    }
+  }
+
   static async processQueue(sessionId: string) {
     const isPaused = db.prepare("SELECT is_paused FROM session_state WHERE sessionId = ?").get(sessionId) as { is_paused: number } | undefined;
     if (isPaused && isPaused.is_paused) return;
@@ -233,7 +276,9 @@ export class QueueManager {
         }
       });
 
-      socket.write(JSON.stringify({ version: PROTOCOL_VERSION, requestId: next.id, message: next.message }) + "\n");
+      const sessionMeta = db.prepare("SELECT workspacePath FROM session_state WHERE sessionId = ?").get(sessionId) as { workspacePath: string } | undefined;
+      const workspacePath = sessionMeta ? sessionMeta.workspacePath : undefined;
+      socket.write(JSON.stringify({ version: PROTOCOL_VERSION, requestId: next.id, sessionId, workspacePath, message: next.message }) + "\n");
     } catch (err) {
       db.prepare("UPDATE requests SET status = 'failed' WHERE id = ?").run(next.id);
       QueueManager.appendEvent(sessionId, next.id, "error", { error: "Agent connection failed" });

@@ -5,7 +5,10 @@ export const PROTOCOL_VERSION = 1;
 export const AgentRequestSchema = z.object({
   version: z.literal(PROTOCOL_VERSION),
   requestId: z.string(),
-  message: z.string(),
+  sessionId: z.string().optional(),
+  workspacePath: z.string().optional(),
+  command: z.enum(["message", "reset", "delete"]).optional().default("message"),
+  message: z.string().optional().default(""),
 });
 
 export type AgentRequest = z.infer<typeof AgentRequestSchema>;

@@ -9,7 +9,14 @@ const SOCKET_PATH =
     ? "\\\\.\\pipe\\lali-agent"
     : "/tmp/lali-agent.sock";
 
-const session = new PiSession();
+const sessions = new Map<string, PiSession>();
+
+function getSession(sessionId: string): PiSession {
+  if (!sessions.has(sessionId)) {
+    sessions.set(sessionId, new PiSession());
+  }
+  return sessions.get(sessionId)!;
+}
 
 const server = net.createServer((socket) => {
   let buffer = "";
@@ -40,6 +47,33 @@ const server = net.createServer((socket) => {
         }
 
         const req = reqResult.data;
+        const sessionId = req.sessionId || "default";
+
+        if (req.command === "reset") {
+          sessions.set(sessionId, new PiSession());
+          socket.write(
+            JSON.stringify({
+              type: "done",
+              finalResponse: "Session reset",
+              requestId: req.requestId,
+            }) + "\n",
+          );
+          continue;
+        }
+
+        if (req.command === "delete") {
+          sessions.delete(sessionId);
+          socket.write(
+            JSON.stringify({
+              type: "done",
+              finalResponse: "Session deleted",
+              requestId: req.requestId,
+            }) + "\n",
+          );
+          continue;
+        }
+
+        const session = getSession(sessionId);
 
         const textListener = (text: string) => {
           socket.write(
