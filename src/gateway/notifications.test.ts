@@ -11,7 +11,7 @@ describe("Notifications", () => {
     const id = NotificationManager.create({
       type: "interrupted",
       summary: "Run was interrupted by user",
-      relatedSessionId: "session-1",
+      context: { sessionId: "session-1" },
     });
 
     const notif = db.prepare("SELECT * FROM notifications WHERE id = ?").get(id) as any;

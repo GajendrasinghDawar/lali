@@ -1,5 +1,6 @@
 import { db } from "./auth.ts";
 import { QueueManager, queueEvents } from "./queue.ts";
+import { EffectManager } from "./effects.ts";
 import { NotificationManager, notificationEvents } from "./notifications.ts";
 
 const MAX_TELEGRAM_LENGTH = 4000;
@@ -55,6 +56,40 @@ async function startTelegramPolling() {
 
       for (const update of data.result) {
         offset = update.update_id + 1;
+
+        if (update.callback_query && update.callback_query.from.id === config.ownerId) {
+          const cbData = update.callback_query.data;
+          const action = cbData.substring(0, 4);
+          const effectId = cbData.substring(4);
+          
+          try {
+            const effect = db.prepare("SELECT digest, sessionId, requestId FROM effects WHERE id = ?").get(effectId) as { digest: string, sessionId: string, requestId: string } | undefined;
+            if (effect) {
+              if (action === "app:") {
+                EffectManager.approve(effectId, effect.digest);
+                const execResult = await EffectManager.execute(effectId);
+                QueueManager.submitRequest(effect.sessionId, "owner", JSON.stringify({ type: "effect_result", id: effectId, result: execResult }), "tg_app_" + update.callback_query.id, "telegram");
+              } else if (action === "rej:") {
+                const sessionId = EffectManager.reject(effectId);
+                QueueManager.submitRequest(sessionId, "owner", JSON.stringify({ type: "effect_result", id: effectId, result: { success: false, error: "Rejected by user" } }), "tg_rej_" + update.callback_query.id, "telegram");
+              }
+              // Answer callback query
+              await fetch(`https://api.telegram.org/bot${config.token}/answerCallbackQuery`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ callback_query_id: update.callback_query.id, text: "Decision recorded" })
+              });
+            }
+          } catch (e) {
+             console.error("Effect decision failed:", e);
+             const errorMessage = e instanceof Error ? e.message : String(e);
+             await fetch(`https://api.telegram.org/bot${config.token}/answerCallbackQuery`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ callback_query_id: update.callback_query.id, text: "Failed: " + errorMessage })
+              });
+          }
+        }
 
         if (update.message && update.message.chat.type === "private") {
           const fromId = update.message.from.id;
@@ -182,7 +217,7 @@ async function processNotificationDeliveries() {
 
   try {
     while (true) {
-      const notif = db.prepare("SELECT id, summary, telegramStatus FROM notifications WHERE telegramStatus IN ('pending', 'retrying') LIMIT 1").get() as { id: string, summary: string, telegramStatus: string } | undefined;
+      const notif = db.prepare("SELECT id, summary, type, relatedEffectId, telegramStatus FROM notifications WHERE telegramStatus IN ('pending', 'retrying') LIMIT 1").get() as { id: string, summary: string, type: string, relatedEffectId: string, telegramStatus: string } | undefined;
       if (!notif) break;
 
       try {
