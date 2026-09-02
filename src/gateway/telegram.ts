@@ -252,12 +252,38 @@ async function processNotificationDeliveries() {
       if (!notif) break;
 
       try {
+        let text = notif.summary;
+        let reply_markup = undefined;
+
+        if (notif.type === 'approval' && notif.relatedEffectId) {
+          const effect = db.prepare("SELECT payload, digest FROM effects WHERE id = ?").get(notif.relatedEffectId) as { payload: string, digest: string } | undefined;
+          if (effect) {
+            const shortDigest = effect.digest.substring(0, 16);
+            try {
+              const payload = JSON.parse(effect.payload);
+              if (payload.action === 'send_email') {
+                text += `\n\nTo: ${payload.to}\nSubject: ${payload.subject}\n\n${payload.body}`;
+              }
+            } catch (e) {}
+
+            reply_markup = {
+              inline_keyboard: [
+                [
+                  { text: "Approve", callback_data: `app:${notif.relatedEffectId}:${shortDigest}` },
+                  { text: "Reject", callback_data: `rej:${notif.relatedEffectId}:${shortDigest}` }
+                ]
+              ]
+            };
+          }
+        }
+
         const response = await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: config.ownerIdString,
-            text: notif.summary
+            text: text.substring(0, MAX_TELEGRAM_LENGTH),
+            reply_markup
           })
         });
         if (!response.ok) throw new Error(`Send error: ${response.status}`);

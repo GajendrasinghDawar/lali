@@ -33,6 +33,17 @@ export class PiSession extends EventEmitter {
       };
     }
 
+    if (message.includes("send email to") && !isEffectResult) {
+      this.emit("lifecycle", "proposing_effect");
+      const matchTo = message.match(/to\s+([^\s,;]+)/i);
+      const to = matchTo ? matchTo[1] : "test@example.com";
+      return {
+        type: "effect",
+        summary: `Send email to ${to}`,
+        payload: { action: "send_email", to, subject: "Hello", body: "This is a test email body." }
+      };
+    }
+
     this.emit("lifecycle", "start_streaming");
     const fakeResponse = `You said: "${message}". This is a fake deterministic response from the Pi SDK.`;
     

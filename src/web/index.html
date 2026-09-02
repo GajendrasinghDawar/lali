@@ -296,9 +296,21 @@
       let payloadObj = {};
       try { payloadObj = JSON.parse(effect.payload); } catch(e) { payloadObj = effect.payload; }
       
+      let detailsHTML = `<pre style="background:#f0f0f0;padding:4px">${JSON.stringify(payloadObj, null, 2)}</pre>`;
+      if (payloadObj.action === 'send_email') {
+        detailsHTML = `
+          <div style="background:#eef; padding:8px; margin: 8px 0;">
+            <div><strong>To:</strong> ${payloadObj.to}</div>
+            <div><strong>Subject:</strong> ${payloadObj.subject}</div>
+            <hr/>
+            <div style="white-space: pre-wrap;">${payloadObj.body}</div>
+          </div>
+        `;
+      }
+
       div.innerHTML = `
         <strong>Effect Proposed:</strong> ${effect.summary}<br/>
-        <pre style="background:#f0f0f0;padding:4px">${JSON.stringify(payloadObj, null, 2)}</pre>
+        ${detailsHTML}
         <button onclick="approveEffect('${effect.id}', '${effect.digest}', this)">Approve</button>
         <button onclick="rejectEffect('${effect.id}', this)">Reject</button>
       `;

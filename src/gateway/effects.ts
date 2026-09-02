@@ -108,17 +108,44 @@ export class EffectManager {
       throw new Error("Effect not approved or already executed");
     }
 
+    
     const payload = JSON.parse(effect.payload);
 
     let execResult;
-    // Fake execution logic
-    if (payload.action === "fake_transfer") {
-      execResult = { success: true, data: `Executed ${payload.action} with amount ${payload.amount}`, sessionId: effect.sessionId };
-    } else {
-      execResult = { success: true, data: "Executed generic fake effect", sessionId: effect.sessionId };
+    try {
+      if (payload.action === "fake_transfer") {
+        execResult = { success: true, data: `Executed ${payload.action} with amount ${payload.amount}`, sessionId: effect.sessionId };
+      } else if (payload.action === "send_email") {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + process.env.RESEND_API_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+            to: payload.to,
+            subject: payload.subject,
+            text: payload.body
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error("Resend API error: " + res.status);
+        }
+
+        const data = await res.json();
+        execResult = { success: true, data, sessionId: effect.sessionId };
+      } else {
+        execResult = { success: true, data: "Executed generic fake effect", sessionId: effect.sessionId };
+      }
+
+      db.prepare("UPDATE effects SET status = 'executed' WHERE id = ?").run(id);
+    } catch (e) {
+      db.prepare("UPDATE effects SET status = 'unknown' WHERE id = ?").run(id);
+      throw new Error(`Execution error (status unknown): ${e instanceof Error ? e.message : String(e)}`);
     }
-    
-    db.prepare("UPDATE effects SET status = 'executed' WHERE id = ?").run(id);
+
     return execResult;
   }
 }
