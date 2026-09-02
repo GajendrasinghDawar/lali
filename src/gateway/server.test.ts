@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
-import { app, db } from "./server";
-import { QueueManager } from "./queue";
+import { app, db } from "./server.ts";
+import { QueueManager } from "./queue.ts";
 
-vi.mock("./auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./auth")>();
+vi.mock("./auth.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./auth.ts")>();
   return {
     ...actual,
     auth: {

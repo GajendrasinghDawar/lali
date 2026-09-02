@@ -4,7 +4,10 @@ import { PiSession } from "./pi.ts";
 import { AgentRequestSchema } from "../shared/protocol.ts";
 import { applySocketUmask, restoreSocketUmask } from "./socket-permissions.ts";
 
-const SOCKET_PATH = os.platform() === "win32" ? "\\\\.\\pipe\\lali-agent" : "/tmp/lali-agent.sock";
+const SOCKET_PATH =
+  os.platform() === "win32"
+    ? "\\\\.\\pipe\\lali-agent"
+    : "/tmp/lali-agent.sock";
 
 const session = new PiSession();
 
@@ -22,21 +25,36 @@ const server = net.createServer((socket) => {
       try {
         const parsed = JSON.parse(msg);
         const reqResult = AgentRequestSchema.safeParse(parsed);
-        
+
         if (!reqResult.success) {
           console.error("Protocol error:", reqResult.error);
           const reqId = parsed.requestId || "unknown";
-          socket.write(JSON.stringify({ type: "error", error: "Incompatible protocol version or invalid format", requestId: reqId }) + "\n");
+          socket.write(
+            JSON.stringify({
+              type: "error",
+              error: "Incompatible protocol version or invalid format",
+              requestId: reqId,
+            }) + "\n",
+          );
           continue;
         }
-        
+
         const req = reqResult.data;
 
         const textListener = (text: string) => {
-          socket.write(JSON.stringify({ type: "text", text, requestId: req.requestId }) + "\n");
+          socket.write(
+            JSON.stringify({ type: "text", text, requestId: req.requestId }) +
+              "\n",
+          );
         };
         const lifecycleListener = (event: string) => {
-          socket.write(JSON.stringify({ type: "lifecycle", event, requestId: req.requestId }) + "\n");
+          socket.write(
+            JSON.stringify({
+              type: "lifecycle",
+              event,
+              requestId: req.requestId,
+            }) + "\n",
+          );
         };
 
         session.on("text", textListener);
@@ -44,9 +62,21 @@ const server = net.createServer((socket) => {
 
         try {
           const finalResponse = await session.sendMessage(req.message);
-          socket.write(JSON.stringify({ type: "done", finalResponse, requestId: req.requestId }) + "\n");
+          socket.write(
+            JSON.stringify({
+              type: "done",
+              finalResponse,
+              requestId: req.requestId,
+            }) + "\n",
+          );
         } catch (e) {
-          socket.write(JSON.stringify({ type: "error", error: String(e), requestId: req.requestId }) + "\n");
+          socket.write(
+            JSON.stringify({
+              type: "error",
+              error: String(e),
+              requestId: req.requestId,
+            }) + "\n",
+          );
         } finally {
           session.off("text", textListener);
           session.off("lifecycle", lifecycleListener);
@@ -56,14 +86,17 @@ const server = net.createServer((socket) => {
       }
     }
   });
-  
+
   socket.on("error", (err) => {
     console.error("Socket error", err);
   });
 });
 
 import url from "node:url";
-if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === url.pathToFileURL(process.argv[1]).href
+) {
   applySocketUmask();
   server.listen(SOCKET_PATH, () => {
     restoreSocketUmask();

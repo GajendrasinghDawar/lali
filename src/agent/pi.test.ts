@@ -1,14 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { PiSession } from "./pi";
+import { PiSession } from "./pi.ts";
 
 describe("PiSession", () => {
   it("emits lifecycle events and text when generating response", async () => {
     const session = new PiSession();
     const textEvents: string[] = [];
     const lifecycleEvents: string[] = [];
-
-    session.on("text", (text) => textEvents.push(text));
-    session.on("lifecycle", (event) => lifecycleEvents.push(event));
+    session.on("text", (text: string) => textEvents.push(text));
+    session.on("lifecycle", (event: string) => lifecycleEvents.push(event));
 
     const finalResponse = await session.sendMessage("hello");
 
