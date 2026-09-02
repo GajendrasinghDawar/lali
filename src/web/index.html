@@ -27,12 +27,20 @@
       <button onclick="interruptSession()">Interrupt</button>
       <button onclick="resumeSession()">Resume Queued</button>
       <button onclick="clearSession()">Clear Queue</button>
+      <button onclick="checkEmails()">Check Mail</button>
+      <button onclick="loadEmails()">Inbox</button>
     </div>
   </div>
   
   
   <div id="chat"></div>
-  <div id="notifications-panel" style="border: 1px solid red; padding: 10px; margin-bottom: 10px; display: none;">
+  
+  <div id="emails-panel" style="border: 1px solid blue; padding: 10px; margin-bottom: 10px; display: none;">
+    <h3>Inbox</h3>
+    <ul id="emails-list"></ul>
+  </div>
+
+  <div id="notifications-panel" style="border: 1px solid red; padding: 10px; margin-bottom: 10px; display: none;"> style="border: 1px solid red; padding: 10px; margin-bottom: 10px; display: none;">
     <h3>Notifications</h3>
     <ul id="notifications-list"></ul>
   </div>

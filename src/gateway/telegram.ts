@@ -3,6 +3,7 @@ import { QueueManager, queueEvents } from "./queue.ts";
 import { EffectManager } from "./effects.ts";
 import { ArtifactManager } from "./artifacts.ts";
 import { NotificationManager, notificationEvents } from "./notifications.ts";
+import { EmailManager } from "./email.ts";
 
 const MAX_TELEGRAM_LENGTH = 4000;
 

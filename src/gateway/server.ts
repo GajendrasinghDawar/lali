@@ -210,6 +210,53 @@ app.post("/api/artifacts", doubleCsrfProtection, apiLimiter, express.raw({ limit
   }
 });
 
+import { EmailManager } from "./email.ts";
+
+app.post("/api/emails/check", doubleCsrfProtection, apiLimiter, async (req, res) => {
+  try {
+    QueueManager.assertSessionOwner("main", res.locals.userId);
+    await EmailManager.checkEmails();
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
+  }
+});
+
+app.post("/api/emails/:id/open", doubleCsrfProtection, apiLimiter, (req, res) => {
+  const id = req.params.id as string;
+  try {
+    QueueManager.assertSessionOwner("main", res.locals.userId);
+    const email = EmailManager.getEmail(id);
+    if (!email) return res.status(404).json({ error: "Email not found" });
+
+    let sessionId = email.session_id;
+    if (!sessionId) {
+      sessionId = require("crypto").randomUUID();
+      db.prepare("INSERT INTO session_state (sessionId, userId, type, title, workspaceName) VALUES (?, ?, 'email_thread', ?, 'default')").run(sessionId, res.locals.userId, email.subject || "Email");
+      EmailManager.setSession(id, sessionId);
+
+      const prompt = `You are reviewing an inbound email.\n\n<email>\nFrom: ${email.sender}\nSubject: ${email.subject}\n\n${email.body_text || email.body_html}\n</email>`;
+      QueueManager.submitRequest(sessionId, res.locals.userId, prompt);
+    }
+    res.json({ sessionId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
+  }
+});
+
+app.get("/api/emails", apiLimiter, (req, res) => {
+  try {
+    QueueManager.assertSessionOwner("main", res.locals.userId);
+    const emails = db.prepare("SELECT id, sender, subject, session_id, received_at FROM inbound_emails ORDER BY received_at DESC").all();
+    res.json({ emails });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
+  }
+});
+
 app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { message, sessionId, idempotencyKey, attachmentIds } = req.body;
   if (!message || !sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "Message and sessionId required" });
