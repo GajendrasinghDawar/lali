@@ -16,8 +16,13 @@
 - **No inline imports** (`await import()`, `import("pkg").Type`, dynamic type imports). Top-level imports only.
 - Never remove or downgrade code to fix type errors from outdated deps; upgrade the dep instead.
 - Use only erasable TypeScript syntax (Node strip-only mode) in code checked by the root config (`packages/*/src`, `packages/*/test`, `packages/coding-agent/examples`): no parameter properties, `enum`, `namespace`/`module`, `import =`, `export =`, or other constructs needing JS emit. Use explicit fields with constructor assignments.
-- Use only erasable TypeScript syntax (Node strip-only mode) in code checked by the root config (`packages/*/src`, `packages/*/test`, `packages/coding-agent/examples`): no parameter properties, `enum`, `namespace`/`module`, `import =`, `export =`, or other constructs needing JS emit. Use explicit fields with constructor assignments.
 - Do not preserve backward compatibility unless the user asks for it.
+- **Use modern Node.js built-ins:** Actively look for and utilize the latest features from modern Node.js releases (v22+) rather than relying on outdated patterns or third-party packages.
+  - Use `node:sqlite` instead of `better-sqlite3`.
+  - Use `process.loadEnvFile()` instead of `dotenv`.
+  - Use `node --experimental-strip-types` for running TypeScript natively instead of `tsx`, `ts-node`, or compiling.
+  - Use the Node Permission Model (`--permission`) to lock down production services instead of external sandbox tooling.
+  - Always prefer Node's standard library over adding new dependencies.
 
 ## Agent skills
 
