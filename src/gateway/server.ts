@@ -112,53 +112,53 @@ app.post("/api/sessions", doubleCsrfProtection, apiLimiter, (req, res) => {
   try {
     db.prepare(`INSERT INTO session_state (sessionId, userId, type, title, workspaceName, workspacePath) VALUES (?, ?, 'project', ?, ?, ?)`).run(sessionId, res.locals.userId, title || sessionId, workspaceName, targetPath);
     res.json({ success: true, sessionId });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
   }
 });
 
 app.put("/api/sessions/:id/archive", doubleCsrfProtection, apiLimiter, (req, res) => {
-  const sessionId = req.params.id;
+  const sessionId = req.params.id as string;
   try {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
     db.prepare(`UPDATE session_state SET status = 'archived' WHERE sessionId = ? AND type != 'main'`).run(sessionId);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(403).json({ error: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: message });
   }
 });
 
 app.put("/api/sessions/:id/restore", doubleCsrfProtection, apiLimiter, (req, res) => {
-  const sessionId = req.params.id;
+  const sessionId = req.params.id as string;
   try {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
     db.prepare(`UPDATE session_state SET status = 'active' WHERE sessionId = ?`).run(sessionId);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(403).json({ error: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: message });
   }
 });
 
 app.post("/api/sessions/:id/reset", doubleCsrfProtection, apiLimiter, async (req, res) => {
-  const sessionId = req.params.id;
+  const sessionId = req.params.id as string;
   try {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
     await QueueManager.resetSession(sessionId);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(403).json({ error: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: message });
   }
 });
 
 app.delete("/api/sessions/:id", doubleCsrfProtection, apiLimiter, async (req, res) => {
-  const sessionId = req.params.id;
+  const sessionId = req.params.id as string;
   try {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
     if (sessionId === "main") return res.status(400).json({ error: "Cannot delete main session" });
     await QueueManager.deleteSession(sessionId);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(403).json({ error: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: message });
   }
 });
 
@@ -171,8 +171,8 @@ app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
   try {
     const request = QueueManager.submitRequest(sessionId, res.locals.userId, message, idempotencyKey);
     res.status(202).json({ requestId: request.id, status: request.status });
-  } catch (err: any) {
-    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
   }
 });
 
@@ -184,8 +184,8 @@ app.post("/chat/interrupt", doubleCsrfProtection, apiLimiter, (req, res) => {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
     QueueManager.interruptSession(sessionId);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
   }
 });
 
@@ -197,8 +197,8 @@ app.post("/chat/resume", doubleCsrfProtection, apiLimiter, (req, res) => {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
     QueueManager.resumeSession(sessionId);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
   }
 });
 
@@ -210,8 +210,8 @@ app.post("/chat/clear", doubleCsrfProtection, apiLimiter, (req, res) => {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
     QueueManager.clearSession(sessionId);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
   }
 });
 
@@ -221,8 +221,8 @@ app.get("/effects/pending", apiLimiter, (req, res) => {
   
   try {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
-  } catch (err: any) {
-    return res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    return res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
   }
 
   const pending = db.prepare("SELECT * FROM effects WHERE sessionId = ? AND status = 'pending'").all(sessionId);
@@ -248,8 +248,8 @@ app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, r
     }));
     
     res.json({ success: true, result });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
   }
 });
 
@@ -269,8 +269,8 @@ app.post("/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => 
     }));
     
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
   }
 });
 
@@ -281,8 +281,8 @@ app.get("/chat/events", apiLimiter, (req, res) => {
 
   try {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
-  } catch (err: any) {
-    return res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+    return res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
   }
 
   res.setHeader("Content-Type", "text/event-stream");
