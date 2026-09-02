@@ -4,6 +4,7 @@ import * as net from "net";
 import * as os from "os";
 import { AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol.ts";
 import type { AgentEvent } from "../shared/protocol.ts";
+import { EffectManager } from "./effects.ts";
 
 // Setup schema
 db.exec(`
@@ -184,6 +185,12 @@ export class QueueManager {
           db.prepare("UPDATE requests SET status = ? WHERE id = ?").run(event.type === "done" ? "completed" : "failed", next.id);
           responseEmitters.delete(next.id);
           QueueManager.appendEvent(sessionId, next.id, event.type, event.type === "done" ? { finalResponse: event.finalResponse } : { error: event.error });
+          setTimeout(() => QueueManager.processQueue(sessionId), 0);
+        } else if (event.type === "propose_effect") {
+          db.prepare("UPDATE requests SET status = 'completed' WHERE id = ?").run(next.id);
+          responseEmitters.delete(next.id);
+          const effect = EffectManager.propose(sessionId, next.id, event.summary, event.payload);
+          QueueManager.appendEvent(sessionId, next.id, "propose_effect", { effect });
           setTimeout(() => QueueManager.processQueue(sessionId), 0);
         } else if (event.type === "text") {
           QueueManager.appendEvent(sessionId, next.id, "text", { text: event.text });

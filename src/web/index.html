@@ -65,6 +65,21 @@
     }
     init();
 
+    async function fetchPendingEffects() {
+      const res = await fetch(`/effects/pending?sessionId=${sessionId}`);
+      const data = await res.json();
+      if (data.effects) {
+        for (const effect of data.effects) {
+          const div = document.createElement('div');
+          div.className = 'message agent';
+          div.innerHTML = `<span class="agent">Agent:</span> `;
+          chat.appendChild(div);
+          renderEffectProposal(effect, div);
+        }
+      }
+    }
+    fetchPendingEffects();
+
     async function loginGitHub() {
       const res = await fetch("/api/auth/sign-in/social", {
         method: "POST",
@@ -149,6 +164,46 @@
       }
     });
 
+    async function approveEffect(id, digest, btn) {
+      btn.disabled = true;
+      const res = await fetch(`/effects/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+        body: JSON.stringify({ digest })
+      });
+      const data = await res.json();
+      btn.parentNode.innerHTML += `<div><strong>Result:</strong> ${data.success ? 'Approved' : 'Failed: ' + data.error}</div>`;
+    }
+
+    async function rejectEffect(id, btn) {
+      btn.disabled = true;
+      const res = await fetch(`/effects/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }
+      });
+      const data = await res.json();
+      btn.parentNode.innerHTML += `<div><strong>Result:</strong> ${data.success ? 'Rejected' : 'Failed: ' + data.error}</div>`;
+    }
+
+    function renderEffectProposal(effect, container) {
+      const div = document.createElement('div');
+      div.style.border = "1px solid orange";
+      div.style.padding = "0.5rem";
+      div.style.marginTop = "0.5rem";
+      
+      let payloadObj = {};
+      try { payloadObj = JSON.parse(effect.payload); } catch(e) { payloadObj = effect.payload; }
+      
+      div.innerHTML = `
+        <strong>Effect Proposed:</strong> ${effect.summary}<br/>
+        <pre style="background:#f0f0f0;padding:4px">${JSON.stringify(payloadObj, null, 2)}</pre>
+        <button onclick="approveEffect('${effect.id}', '${effect.digest}', this)">Approve</button>
+        <button onclick="rejectEffect('${effect.id}', this)">Reject</button>
+      `;
+      container.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
     let sse = null;
     function connectSSE() {
       if (sse) return;
@@ -170,9 +225,13 @@
         } else if (data.type === 'text') {
           agentContentSpan.innerText += data.text;
           chat.scrollTop = chat.scrollHeight;
+        } else if (data.type === 'propose_effect') {
+          if (currentStatusSpan) currentStatusSpan.innerText = 'Proposed effect.';
+          renderEffectProposal(data.effect, agentContentSpan.parentNode);
+          agentContentSpan = appendMessage('Agent', '', 'agent');
+          currentStatusSpan = null;
         } else if (data.type === 'done') {
           if (currentStatusSpan) currentStatusSpan.innerText = 'Completed.';
-          // start new span for next request
           agentContentSpan = appendMessage('Agent', '', 'agent');
           currentStatusSpan = null;
         } else if (data.type === 'error') {

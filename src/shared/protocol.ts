@@ -15,7 +15,8 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("lifecycle"), event: z.string(), requestId: z.string() }),
   z.object({ type: z.literal("done"), finalResponse: z.string(), requestId: z.string() }),
   z.object({ type: z.literal("error"), error: z.string(), requestId: z.string() }),
-  z.object({ type: z.literal("system"), event: z.string(), requestId: z.string().optional(), message: z.string().optional() })
+  z.object({ type: z.literal("system"), event: z.string(), requestId: z.string().optional(), message: z.string().optional() }),
+  z.object({ type: z.literal("propose_effect"), summary: z.string(), payload: z.unknown(), requestId: z.string() })
 ]);
 
 export type AgentEvent = z.infer<typeof AgentEventSchema>;

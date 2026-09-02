@@ -16,7 +16,7 @@ describe("PiSession", () => {
     expect(lifecycleEvents).toContain("done_streaming");
 
     const completeText = textEvents.join("");
-    expect(completeText).toBe(finalResponse);
-    expect(finalResponse).toContain("hello");
+    expect(completeText).toBe((finalResponse as any).text);
+    expect((finalResponse as any).text).toContain("hello");
   });
 });

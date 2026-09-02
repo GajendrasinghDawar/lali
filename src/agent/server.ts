@@ -62,13 +62,25 @@ const server = net.createServer((socket) => {
 
         try {
           const finalResponse = await session.sendMessage(req.message);
-          socket.write(
-            JSON.stringify({
-              type: "done",
-              finalResponse,
-              requestId: req.requestId,
-            }) + "\n",
-          );
+          
+          if (finalResponse && finalResponse.type === "effect") {
+            socket.write(
+              JSON.stringify({
+                type: "propose_effect",
+                summary: finalResponse.summary,
+                payload: finalResponse.payload,
+                requestId: req.requestId,
+              }) + "\n",
+            );
+          } else {
+            socket.write(
+              JSON.stringify({
+                type: "done",
+                finalResponse: finalResponse ? finalResponse.text : "",
+                requestId: req.requestId,
+              }) + "\n",
+            );
+          }
         } catch (e) {
           socket.write(
             JSON.stringify({

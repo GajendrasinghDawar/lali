@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 import { app, db } from "./server.ts";
 import { QueueManager } from "./queue.ts";
+import { EffectManager } from "./effects.ts";
 
 vi.mock("./auth.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./auth.ts")>();
@@ -97,5 +98,35 @@ describe("Gateway API", () => {
       .send({ sessionId: "sess1" });
     const req2Resumed = db.prepare("SELECT status FROM requests WHERE id = ?").get(res2.body.requestId) as { status: string };
     expect(["queued", "running"]).toContain(req2Resumed.status);
+  });
+
+  it("handles effect proposal and execution flow", async () => {
+    const payload = { action: "fake_transfer", amount: 100 };
+    const effect = EffectManager.propose("sess1", "req1", "Transfer 100", payload);
+    
+    // Check pending
+    const res = await request(app)
+      .get("/effects/pending?sessionId=sess1")
+      .set("Cookie", cookie);
+    expect(res.body.effects).toHaveLength(1);
+    expect(res.body.effects[0].id).toBe(effect.id);
+
+    // Approve
+    const approveRes = await request(app)
+      .post(`/effects/${effect.id}/approve`)
+      .set("Cookie", cookie)
+      .set("x-csrf-token", csrfToken)
+      .send({ digest: effect.digest });
+    
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.result.success).toBe(true);
+
+    const req = db.prepare("SELECT * FROM requests WHERE sessionId = 'sess1' AND message LIKE '%effect_result%'").get();
+    expect(req).toBeDefined();
+  });
+
+  it("prevents Agent from approving effects or calling arbitrary operations", async () => {
+    const { AgentEventSchema } = await import("../shared/protocol.ts");
+    expect(() => AgentEventSchema.parse({ type: "approve_effect" })).toThrow();
   });
 });

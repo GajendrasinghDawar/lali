@@ -11,6 +11,7 @@ import helmet from "helmet";
 import { auth, db, checkAuthHealth, checkDbHealth } from "./auth.ts";
 import { toNodeHandler } from "better-auth/node";
 import { QueueManager, sseEmitters } from "./queue.ts";
+import { EffectManager } from "./effects.ts";
 
 const app = express();
 app.use(helmet());
@@ -107,6 +108,52 @@ app.post("/chat/clear", doubleCsrfProtection, apiLimiter, (req, res) => {
   
   QueueManager.clearSession(sessionId);
   res.json({ success: true });
+});
+
+app.get("/effects/pending", apiLimiter, (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST" });
+  const pending = db.prepare("SELECT * FROM effects WHERE sessionId = ? AND status = 'pending'").all(sessionId);
+  res.json({ effects: pending });
+});
+
+app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, res) => {
+  const id = req.params.id as string;
+  const digest = req.body.digest as string;
+  try {
+    EffectManager.approve(id, digest);
+    const result = await EffectManager.execute(id);
+    const effect = db.prepare("SELECT sessionId FROM effects WHERE id = ?").get(id) as any;
+    
+    // Submit the result as a new request back to the agent so it can resume
+    QueueManager.submitRequest(effect.sessionId, JSON.stringify({
+      type: "effect_result",
+      id,
+      result
+    }));
+    
+    res.json({ success: true, result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post("/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => {
+  const id = req.params.id as string;
+  try {
+    EffectManager.reject(id);
+    const effect = db.prepare("SELECT sessionId FROM effects WHERE id = ?").get(id) as any;
+    
+    QueueManager.submitRequest(effect.sessionId, JSON.stringify({
+      type: "effect_result",
+      id,
+      result: { success: false, error: "Rejected by user" }
+    }));
+    
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get("/chat/events", apiLimiter, (req, res) => {
