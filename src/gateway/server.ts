@@ -28,7 +28,17 @@ function getWorkspaces(): Record<string, string> {
 
 const app = express();
 initNotifications();
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'"],
+    }
+  }
+}));
 app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser(process.env.COOKIE_SECRET || "lali-secret"));
 
