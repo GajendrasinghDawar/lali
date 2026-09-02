@@ -189,12 +189,33 @@ app.delete("/api/sessions/:id", doubleCsrfProtection, apiLimiter, async (req, re
 
 app.use(express.static(path.join(import.meta.dirname, "../web")));
 
+import { ArtifactManager } from "./artifacts.ts";
+
+app.post("/api/artifacts", doubleCsrfProtection, apiLimiter, express.raw({ limit: '20mb', type: 'application/octet-stream' }), (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  if (!sessionId) return res.status(400).json({ error: "sessionId required" });
+
+  try {
+    QueueManager.assertSessionOwner(sessionId, res.locals.userId);
+    
+    const fileName = req.headers["x-file-name"] as string || "upload.bin";
+    const mimeType = req.headers["x-file-type"] as string || "application/octet-stream";
+    const buffer = req.body as Buffer;
+
+    const id = ArtifactManager.store(sessionId, fileName, mimeType, buffer);
+    res.json({ id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
+  }
+});
+
 app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
-  const { message, sessionId, idempotencyKey } = req.body;
+  const { message, sessionId, idempotencyKey, attachmentIds } = req.body;
   if (!message || !sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "Message and sessionId required" });
 
   try {
-    const request = QueueManager.submitRequest(sessionId, res.locals.userId, message, idempotencyKey);
+    const request = QueueManager.submitRequest(sessionId, res.locals.userId, message, idempotencyKey, "web", attachmentIds);
     res.status(202).json({ requestId: request.id, status: request.status });
   } catch (err) { const message = err instanceof Error ? err.message : String(err);
     res.status(403).json({ error: "ERR_UNAUTHORIZED", message });

@@ -22,6 +22,10 @@ db.exec(`
     finalResponse TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+`);
+  try { db.exec('ALTER TABLE requests ADD COLUMN attachmentIds TEXT'); } catch (e) {}
+
+db.exec(`
   
   CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,7 +134,7 @@ export class QueueManager {
     }
   }
 
-  static submitRequest(sessionId: string, userId: string, message: string, idempotencyKey?: string, replyChannel: string = "web") {
+  static submitRequest(sessionId: string, userId: string, message: string, idempotencyKey?: string, replyChannel: string = "web", attachmentIds?: string[]) {
     QueueManager.assertSessionOwner(sessionId, userId);
 
     if (idempotencyKey) {
@@ -236,7 +240,7 @@ export class QueueManager {
     const running = db.prepare("SELECT count(*) as count FROM requests WHERE sessionId = ? AND status = 'running'").get(sessionId) as { count: number };
     if (running.count > 0) return;
 
-    const next = db.prepare("SELECT * FROM requests WHERE sessionId = ? AND status = 'queued' ORDER BY created_at ASC LIMIT 1").get(sessionId) as { id: string, message: string } | undefined;
+    const next = db.prepare("SELECT * FROM requests WHERE sessionId = ? AND status = 'queued' ORDER BY created_at ASC LIMIT 1").get(sessionId) as { id: string, message: string, attachmentIds: string | null } | undefined;
     if (!next) return;
 
     db.prepare("UPDATE requests SET status = 'running' WHERE id = ?").run(next.id);
@@ -282,7 +286,21 @@ export class QueueManager {
 
       const sessionMeta = db.prepare("SELECT workspacePath FROM session_state WHERE sessionId = ?").get(sessionId) as { workspacePath: string } | undefined;
       const workspacePath = sessionMeta ? sessionMeta.workspacePath : undefined;
-      socket.write(JSON.stringify({ version: PROTOCOL_VERSION, requestId: next.id, sessionId, workspacePath, message: next.message }) + "\n");
+      let artifacts = undefined;
+      if (next.attachmentIds) {
+         try {
+           const attachmentIds = JSON.parse(next.attachmentIds);
+           if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+              const placeholders = attachmentIds.map(() => "?").join(",");
+              const artifactRows = db.prepare(`SELECT id, fileName as name, mimeType, storagePath as path FROM artifacts WHERE id IN (${placeholders})`).all(...attachmentIds) as any[];
+              artifacts = artifactRows.map(r => ({ id: r.id, name: r.name, mimeType: r.mimeType, path: r.path }));
+           }
+         } catch (e) {
+           console.error("Failed to parse attachmentIds", e);
+         }
+      }
+
+      socket.write(JSON.stringify({ version: PROTOCOL_VERSION, requestId: next.id, sessionId, workspacePath, message: next.message, artifacts }) + "\n");
     } catch (err) {
       db.prepare("UPDATE requests SET status = 'failed' WHERE id = ?").run(next.id);
       QueueManager.appendEvent(sessionId, next.id, "error", { error: "Agent connection failed" });

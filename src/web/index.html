@@ -38,7 +38,10 @@
   </div>
 
   <form id="form">
-    <input type="text" id="input" style="width: 80%;" placeholder="Type a message..." required />
+    <input type="file" id="fileInput" multiple style="display: none;" />
+    <button type="button" onclick="document.getElementById('fileInput').click()">📎</button>
+    <div id="filePreview" style="display: inline-block; font-size: 0.8em; margin-right: 5px;"></div>
+    <input type="text" id="input" style="width: 70%;" placeholder="Type a message..." />
     <button type="submit">Send</button>
   </form>
 
@@ -185,23 +188,63 @@
 
     const sessionId = crypto.randomUUID();
 
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    let selectedFiles = [];
+
+    fileInput.addEventListener('change', () => {
+      selectedFiles = Array.from(fileInput.files);
+      filePreview.innerText = selectedFiles.map(f => f.name).join(', ');
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const message = input.value;
+      if (!message && selectedFiles.length === 0) return;
       input.value = '';
+      
+      const filesToUpload = selectedFiles;
+      selectedFiles = [];
+      filePreview.innerText = '';
+      fileInput.value = '';
 
-      appendMessage('You', message, 'user');
+      let attachmentDisplay = filesToUpload.length > 0 ? `<br><em>Attachments: ${filesToUpload.map(f => f.name).join(', ')}</em>` : '';
+      appendMessage('You', message + attachmentDisplay, 'user');
       
       const idempotencyKey = crypto.randomUUID();
 
       try {
+        let attachmentIds = [];
+        for (const file of filesToUpload) {
+          if (file.size > 20 * 1024 * 1024) {
+             appendMessage('System', `File ${file.name} is too large (max 20MB)`, 'system');
+             return;
+          }
+          const uploadRes = await fetch('/api/artifacts?sessionId=' + sessionId, {
+            method: 'POST',
+            headers: {
+              'x-csrf-token': csrfToken,
+              'x-file-name': file.name,
+              'x-file-type': file.type || 'application/octet-stream',
+              'Content-Type': 'application/octet-stream'
+            },
+            body: file
+          });
+          if (!uploadRes.ok) {
+             const errData = await uploadRes.json();
+             throw new Error(errData.error || "Upload failed");
+          }
+          const { id } = await uploadRes.json();
+          attachmentIds.push(id);
+        }
+
         const response = await fetch('/chat', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
             'x-csrf-token': csrfToken
           },
-          body: JSON.stringify({ message, sessionId, idempotencyKey })
+          body: JSON.stringify({ message: message || "Uploaded file", sessionId, idempotencyKey, attachmentIds })
         });
         
         if (response.status !== 202) {

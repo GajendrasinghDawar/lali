@@ -2,6 +2,13 @@ import { z } from "zod";
 
 export const PROTOCOL_VERSION = 1;
 
+export const ArtifactSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  mimeType: z.string(),
+  path: z.string(),
+});
+
 export const AgentRequestSchema = z.object({
   version: z.literal(PROTOCOL_VERSION),
   requestId: z.string(),
@@ -9,6 +16,7 @@ export const AgentRequestSchema = z.object({
   workspacePath: z.string().optional(),
   command: z.enum(["message", "reset", "delete"]).optional().default("message"),
   message: z.string().optional().default(""),
+  artifacts: z.array(ArtifactSchema).optional(),
 });
 
 export type AgentRequest = z.infer<typeof AgentRequestSchema>;
