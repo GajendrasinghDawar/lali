@@ -2,7 +2,7 @@ import { db } from "./auth";
 import crypto from "crypto";
 import * as net from "net";
 import * as os from "os";
-import { AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol";
+import { AgentEvent, AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol";
 
 // Setup schema
 db.exec(`
@@ -35,8 +35,8 @@ db.exec(`UPDATE requests SET status = 'interrupted' WHERE status = 'running'`);
 
 const SOCKET_PATH = os.platform() === "win32" ? "\\\\.\\pipe\\lali-agent" : "/tmp/lali-agent.sock";
 let agentSocket: net.Socket | null = null;
-const responseEmitters = new Map<string, (event: any) => void>();
-export const sseEmitters = new Map<string, (event: any) => void>();
+const responseEmitters = new Map<string, (event: AgentEvent) => void>();
+export const sseEmitters = new Map<string, (event: AgentEvent | { type: string, sequence: number, requestId: string, data: unknown }) => void>();
 
 function getAgentSocket(): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
@@ -88,7 +88,7 @@ function getAgentSocket(): Promise<net.Socket> {
 export class QueueManager {
   static submitRequest(sessionId: string, message: string, idempotencyKey?: string) {
     if (idempotencyKey) {
-      const existing = db.prepare("SELECT * FROM requests WHERE sessionId = ? AND idempotencyKey = ?").get(sessionId, idempotencyKey) as any;
+      const existing = db.prepare("SELECT * FROM requests WHERE sessionId = ? AND idempotencyKey = ?").get(sessionId, idempotencyKey) as { id: string, status: string } | undefined;
       if (existing) {
         // Trigger queue in case it was stuck
         setTimeout(() => QueueManager.processQueue(sessionId), 0);
@@ -97,7 +97,7 @@ export class QueueManager {
     }
 
     const id = crypto.randomUUID();
-    const isPaused = db.prepare("SELECT is_paused FROM session_state WHERE sessionId = ?").get(sessionId) as any;
+    const isPaused = db.prepare("SELECT is_paused FROM session_state WHERE sessionId = ?").get(sessionId) as { is_paused: number } | undefined;
     
     let status = "queued";
     if (isPaused && isPaused.is_paused) {
@@ -108,7 +108,7 @@ export class QueueManager {
       id, sessionId, idempotencyKey || null, message, status
     );
 
-    const request = db.prepare("SELECT * FROM requests WHERE id = ?").get(id) as any;
+    const request = db.prepare("SELECT * FROM requests WHERE id = ?").get(id) as { id: string, status: string };
     
     setTimeout(() => QueueManager.processQueue(sessionId), 0);
     return request;
@@ -119,7 +119,7 @@ export class QueueManager {
     return (row.seq || 0) + 1;
   }
 
-  static appendEvent(sessionId: string, requestId: string, type: string, data: any) {
+  static appendEvent(sessionId: string, requestId: string, type: string, data: unknown) {
     const seq = QueueManager.getNextSequence(sessionId);
     db.prepare("INSERT INTO events (sessionId, requestId, type, data, sequence) VALUES (?, ?, ?, ?, ?)").run(
       sessionId, requestId, type, JSON.stringify(data), seq
@@ -132,7 +132,7 @@ export class QueueManager {
   }
 
   static getEventsAfter(sessionId: string, sequence: number) {
-    const rows = db.prepare("SELECT * FROM events WHERE sessionId = ? AND sequence > ? ORDER BY sequence ASC").all(sessionId, sequence) as any[];
+    const rows = db.prepare("SELECT * FROM events WHERE sessionId = ? AND sequence > ? ORDER BY sequence ASC").all(sessionId, sequence) as { type: string, data: string, sequence: number, requestId: string }[];
     return rows.map(r => ({ type: r.type, data: JSON.parse(r.data), sequence: r.sequence, requestId: r.requestId }));
   }
 
@@ -157,13 +157,13 @@ export class QueueManager {
   }
 
   static async processQueue(sessionId: string) {
-    const isPaused = db.prepare("SELECT is_paused FROM session_state WHERE sessionId = ?").get(sessionId) as any;
+    const isPaused = db.prepare("SELECT is_paused FROM session_state WHERE sessionId = ?").get(sessionId) as { is_paused: number } | undefined;
     if (isPaused && isPaused.is_paused) return;
 
     const running = db.prepare("SELECT count(*) as count FROM requests WHERE sessionId = ? AND status = 'running'").get(sessionId) as { count: number };
     if (running.count > 0) return;
 
-    const next = db.prepare("SELECT * FROM requests WHERE sessionId = ? AND status = 'queued' ORDER BY created_at ASC LIMIT 1").get(sessionId) as any;
+    const next = db.prepare("SELECT * FROM requests WHERE sessionId = ? AND status = 'queued' ORDER BY created_at ASC LIMIT 1").get(sessionId) as { id: string, message: string } | undefined;
     if (!next) return;
 
     db.prepare("UPDATE requests SET status = 'running' WHERE id = ?").run(next.id);
@@ -173,7 +173,7 @@ export class QueueManager {
       
       responseEmitters.set(next.id, (event) => {
         // Check if interrupted mid-stream
-        const currentStatus = db.prepare("SELECT status FROM requests WHERE id = ?").get(next.id) as any;
+        const currentStatus = db.prepare("SELECT status FROM requests WHERE id = ?").get(next.id) as { status: string } | undefined;
         if (currentStatus && currentStatus.status === 'interrupted') {
           responseEmitters.delete(next.id);
           return; // Ignore events after interruption

@@ -4,7 +4,7 @@ import { app, db } from "./server";
 import { QueueManager } from "./queue";
 
 vi.mock("./auth", async (importOriginal) => {
-  const actual = await importOriginal<any>();
+  const actual = await importOriginal<typeof import("./auth")>();
   return {
     ...actual,
     auth: {
@@ -86,7 +86,7 @@ describe("Gateway API", () => {
       .set("x-csrf-token", csrfToken)
       .send({ sessionId: "sess1" });
 
-    const req2 = db.prepare("SELECT status FROM requests WHERE id = ?").get(res2.body.requestId) as any;
+    const req2 = db.prepare("SELECT status FROM requests WHERE id = ?").get(res2.body.requestId) as { status: string };
     expect(req2.status).toBe("paused_for_confirmation");
 
     // Resume
@@ -95,7 +95,7 @@ describe("Gateway API", () => {
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send({ sessionId: "sess1" });
-    const req2Resumed = db.prepare("SELECT status FROM requests WHERE id = ?").get(res2.body.requestId) as any;
+    const req2Resumed = db.prepare("SELECT status FROM requests WHERE id = ?").get(res2.body.requestId) as { status: string };
     expect(["queued", "running"]).toContain(req2Resumed.status);
   });
 });

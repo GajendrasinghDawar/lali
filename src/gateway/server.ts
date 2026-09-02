@@ -23,7 +23,7 @@ app.use("/api/auth", toNodeHandler(auth));
 // @ts-ignore
 const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET || "csrf-secret",
-  getSessionIdentifier: (req: any) => {
+  getSessionIdentifier: (req: express.Request) => {
     return req.cookies["better-auth.session_token"] || "unknown";
   },
   cookieName: "x-csrf-token",
@@ -31,7 +31,7 @@ const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production"
   }
-} as any);
+});
 
 const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 
@@ -61,7 +61,7 @@ app.use(async (req, res, next) => {
   if (req.path.startsWith("/api/auth")) return next();
 
   try {
-    const session = await auth.api.getSession({ headers: req.headers as any });
+    const session = await auth.api.getSession({ headers: new Headers(req.headers as Record<string, string>) });
     if (!session) {
       return res.status(401).json({ error: "ERR_UNAUTH", message: "Authentication required" });
     }
