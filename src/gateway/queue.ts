@@ -14,7 +14,15 @@ db.exec(`
     idempotencyKey TEXT,
     message TEXT NOT NULL,
     status TEXT NOT NULL,
+    replyChannel TEXT DEFAULT 'web',
+    deliveryStatus TEXT DEFAULT 'none',
+    finalResponse TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  
+  CREATE TABLE IF NOT EXISTS telegram_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    offset INTEGER NOT NULL DEFAULT 0
   );
   
   CREATE TABLE IF NOT EXISTS events (
@@ -97,7 +105,7 @@ export class QueueManager {
     }
   }
 
-  static submitRequest(sessionId: string, userId: string, message: string, idempotencyKey?: string) {
+  static submitRequest(sessionId: string, userId: string, message: string, idempotencyKey?: string, replyChannel: string = "web") {
     QueueManager.assertSessionOwner(sessionId, userId);
 
     if (idempotencyKey) {
@@ -117,8 +125,8 @@ export class QueueManager {
       status = "paused_for_confirmation";
     }
 
-    db.prepare("INSERT INTO requests (id, sessionId, idempotencyKey, message, status) VALUES (?, ?, ?, ?, ?)").run(
-      id, sessionId, idempotencyKey || null, message, status
+    db.prepare("INSERT INTO requests (id, sessionId, idempotencyKey, message, status, replyChannel) VALUES (?, ?, ?, ?, ?, ?)").run(
+      id, sessionId, idempotencyKey || null, message, status, replyChannel
     );
 
     const request = db.prepare("SELECT * FROM requests WHERE id = ?").get(id) as { id: string, status: string };
@@ -193,9 +201,22 @@ export class QueueManager {
         }
 
         if (event.type === "done" || event.type === "error") {
-          db.prepare("UPDATE requests SET status = ? WHERE id = ?").run(event.type === "done" ? "completed" : "failed", next.id);
+          db.prepare("UPDATE requests SET status = ?, finalResponse = ? WHERE id = ?").run(event.type === "done" ? "completed" : "failed", event.type === "done" ? event.finalResponse : event.error, next.id);
           responseEmitters.delete(next.id);
           QueueManager.appendEvent(sessionId, next.id, event.type, event.type === "done" ? { finalResponse: event.finalResponse } : { error: event.error });
+          
+          if (event.type === "done") {
+            const req = db.prepare("SELECT replyChannel FROM requests WHERE id = ?").get(next.id) as { replyChannel: string };
+            if (req.replyChannel === "telegram") {
+              db.prepare("UPDATE requests SET deliveryStatus = 'pending' WHERE id = ?").run(next.id);
+              import("./telegram.ts").then(({ sendTelegramMessage }) => {
+                sendTelegramMessage(event.finalResponse).then(success => {
+                  db.prepare("UPDATE requests SET deliveryStatus = ? WHERE id = ?").run(success ? "delivered" : "failed", next.id);
+                });
+              }).catch(e => console.error("Failed to load telegram module", e));
+            }
+          }
+          
           setTimeout(() => QueueManager.processQueue(sessionId), 0);
         } else if (event.type === "propose_effect") {
           db.prepare("UPDATE requests SET status = 'completed' WHERE id = ?").run(next.id);
