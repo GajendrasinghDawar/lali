@@ -31,9 +31,7 @@ A durable, Pi-powered personal assistant gateway. Accepts messages from Web and 
 
 ## Current State
 
-The Agent uses a **fake deterministic model** (`pi.ts`) that echoes input back. It does not call a real LLM. To get real AI responses, you need to replace `PiSession.sendMessage()` with a real model API call (Gemini, Claude, OpenAI, etc.).
-
-Everything else -- Gateway, auth, durable queue, effects, notifications, Telegram, email, GitHub publishing, scheduled jobs, backups -- is wired and functional.
+The Agent uses **Azure OpenAI** (`pi.ts`) with streaming chat completions. Conversation history is maintained per session. The Gateway, auth, durable queue, effects, notifications, Telegram, email, GitHub publishing, scheduled jobs, and backups are all wired and functional.
 
 ---
 
@@ -162,42 +160,18 @@ Approving executes the effect. Rejecting discards it. The canonical payload is f
 
 ---
 
-## Connecting a Real AI Model
+## AI Model (Azure OpenAI)
 
-The fake model lives in `src/agent/pi.ts`. To use a real model, replace `PiSession.sendMessage()` with an API call. Example sketch for Gemini:
+The agent uses Azure OpenAI by default. Add these to your `.env`:
 
-```typescript
-// In src/agent/pi.ts
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-export class PiSession extends EventEmitter {
-  async sendMessage(message: string) {
-    this.emit("lifecycle", "start_thinking");
-
-    const response = await ai.models.generateContentStream({
-      model: "gemini-2.5-flash",
-      contents: message,
-    });
-
-    this.emit("lifecycle", "start_streaming");
-    let full = "";
-    for await (const chunk of response) {
-      const text = chunk.text();
-      if (text) {
-        full += text;
-        this.emit("text", text);
-      }
-    }
-
-    this.emit("lifecycle", "done_streaming");
-    return { type: "text", text: full };
-  }
-}
+```env
+AZURE_OPENAI_API_KEY=your-azure-api-key
+AZURE_OPENAI_BASE_URL=https://princ-msg6fgey-southeastasia.services.ai.azure.com
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_API_VERSION=2025-04-01-preview
 ```
 
-Add `GEMINI_API_KEY=...` to your `.env` and `npm install @google/genai`.
+Only `AZURE_OPENAI_API_KEY` is strictly required. The other values have defaults.
 
 ---
 

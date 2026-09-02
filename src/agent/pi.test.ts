@@ -1,4 +1,26 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock the openai module before importing PiSession
+vi.mock("openai", () => {
+  class MockAzureOpenAI {
+    chat = {
+      completions: {
+        create: vi.fn().mockImplementation(async () => {
+          // Return an async iterable that yields chunks
+          const chunks = [
+            { choices: [{ delta: { content: "Hello" } }] },
+            { choices: [{ delta: { content: " there" } }] },
+          ];
+          return (async function* () {
+            for (const chunk of chunks) yield chunk;
+          })();
+        }),
+      },
+    };
+  }
+  return { AzureOpenAI: MockAzureOpenAI };
+});
+
 import { PiSession } from "./pi.ts";
 
 describe("PiSession", () => {
@@ -16,7 +38,7 @@ describe("PiSession", () => {
     expect(lifecycleEvents).toContain("done_streaming");
 
     const completeText = textEvents.join("");
-    expect(completeText).toBe((finalResponse as any).text);
-    expect((finalResponse as any).text).toContain("hello");
+    expect(completeText).toBe("Hello there");
+    expect((finalResponse as { text: string }).text).toBe("Hello there");
   });
 });

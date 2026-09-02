@@ -96,13 +96,14 @@ const server = net.createServer((socket) => {
 
         try {
           const finalResponse = await session.sendMessage(req.message);
+          const resp = finalResponse as Record<string, unknown>;
           
-          if (finalResponse && finalResponse.type === "effect") {
+          if (resp && resp.type === "effect") {
             socket.write(
               JSON.stringify({
                 type: "propose_effect",
-                summary: finalResponse.summary,
-                payload: finalResponse.payload,
+                summary: resp.summary,
+                payload: resp.payload,
                 requestId: req.requestId,
               }) + "\n",
             );
@@ -110,7 +111,7 @@ const server = net.createServer((socket) => {
             socket.write(
               JSON.stringify({
                 type: "done",
-                finalResponse: finalResponse ? finalResponse.text : "",
+                finalResponse: resp ? String(resp.text || "") : "",
                 requestId: req.requestId,
               }) + "\n",
             );
