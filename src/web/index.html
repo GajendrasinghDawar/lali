@@ -164,25 +164,26 @@
       }
     });
 
-    async function approveEffect(id, digest, btn) {
+    async function handleEffectAction(id, action, body, btn) {
       btn.disabled = true;
-      const res = await fetch(`/effects/${id}/approve`, {
+      const res = await fetch(`/effects/${id}/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-        body: JSON.stringify({ digest })
+        body: body ? JSON.stringify(body) : undefined
       });
       const data = await res.json();
-      btn.parentNode.innerHTML += `<div><strong>Result:</strong> ${data.success ? 'Approved' : 'Failed: ' + data.error}</div>`;
+      
+      const resultDiv = document.createElement('div');
+      resultDiv.innerHTML = `<strong>Result:</strong> ${data.success ? action.charAt(0).toUpperCase() + action.slice(1) + 'd' : 'Failed: ' + data.error}`;
+      btn.parentElement.appendChild(resultDiv);
+    }
+
+    async function approveEffect(id, digest, btn) {
+      await handleEffectAction(id, 'approve', { digest }, btn);
     }
 
     async function rejectEffect(id, btn) {
-      btn.disabled = true;
-      const res = await fetch(`/effects/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }
-      });
-      const data = await res.json();
-      btn.parentNode.innerHTML += `<div><strong>Result:</strong> ${data.success ? 'Rejected' : 'Failed: ' + data.error}</div>`;
+      await handleEffectAction(id, 'reject', null, btn);
     }
 
     function renderEffectProposal(effect, container) {
@@ -212,34 +213,44 @@
       let agentContentSpan = appendMessage('Agent', '', 'agent');
       let currentStatusSpan = null;
 
-      sse.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'lifecycle') {
+      const handlers = {
+        lifecycle: (data) => {
           if (!currentStatusSpan) {
             currentStatusSpan = document.createElement('div');
             currentStatusSpan.className = 'lifecycle';
             agentContentSpan.parentNode.appendChild(currentStatusSpan);
           }
           currentStatusSpan.innerText = `Lifecycle: ${data.event}`;
-        } else if (data.type === 'text') {
+        },
+        text: (data) => {
           agentContentSpan.innerText += data.text;
           chat.scrollTop = chat.scrollHeight;
-        } else if (data.type === 'propose_effect') {
+        },
+        propose_effect: (data) => {
           if (currentStatusSpan) currentStatusSpan.innerText = 'Proposed effect.';
           renderEffectProposal(data.effect, agentContentSpan.parentNode);
           agentContentSpan = appendMessage('Agent', '', 'agent');
           currentStatusSpan = null;
-        } else if (data.type === 'done') {
+        },
+        done: (data) => {
           if (currentStatusSpan) currentStatusSpan.innerText = 'Completed.';
           agentContentSpan = appendMessage('Agent', '', 'agent');
           currentStatusSpan = null;
-        } else if (data.type === 'error') {
+        },
+        error: (data) => {
           agentContentSpan.innerText += ` [Error: ${data.error}]`;
-        } else if (data.type === 'interrupted') {
+        },
+        interrupted: (data) => {
           if (currentStatusSpan) currentStatusSpan.innerText = 'Interrupted.';
           agentContentSpan = appendMessage('Agent', '', 'agent');
           currentStatusSpan = null;
+        }
+      };
+
+      sse.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (handlers[data.type]) {
+          handlers[data.type](data);
         }
       };
     }
