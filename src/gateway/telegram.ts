@@ -91,6 +91,35 @@ async function startTelegramPolling() {
           }
         }
 
+        const answerCallback = async (id: string, text: string) => {
+           await fetch(`https://api.telegram.org/bot${config.token}/answerCallbackQuery`, {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({ callback_query_id: id, text })
+           });
+        };
+
+        if (update.callback_query && update.callback_query.from.id === config.ownerId) {
+          const cbData = update.callback_query.data;
+          const [action, effectId, shortDigest] = cbData.split(":");
+          
+          try {
+            if (action === "app") {
+              const sessionId = EffectManager.approveFromTelegram(effectId, shortDigest);
+              const execResult = await EffectManager.execute(effectId);
+              QueueManager.submitRequest(sessionId, "owner", JSON.stringify({ type: "effect_result", id: effectId, result: execResult }), "tg_app_" + update.callback_query.id, "telegram");
+            } else if (action === "rej") {
+              const sessionId = EffectManager.rejectFromTelegram(effectId, shortDigest);
+              QueueManager.submitRequest(sessionId, "owner", JSON.stringify({ type: "effect_result", id: effectId, result: { success: false, error: "Rejected by user" } }), "tg_rej_" + update.callback_query.id, "telegram");
+            }
+            await answerCallback(update.callback_query.id, "Decision recorded");
+          } catch (e) {
+             console.error("Effect decision failed:", e);
+             const errorMessage = e instanceof Error ? e.message : String(e);
+             await answerCallback(update.callback_query.id, "Failed: " + errorMessage);
+          }
+        }
+
         if (update.message && update.message.chat.type === "private") {
           const fromId = update.message.from.id;
           if (fromId === config.ownerId && update.message.text) {

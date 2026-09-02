@@ -92,7 +92,7 @@ describe("Telegram Integration", () => {
           result: [
             {
               update_id: 101,
-              callback_query: { id: "cbq-1", from: { id: 123456 }, data: "app:eff-123" }
+              callback_query: { id: "cbq-1", from: { id: 123456 }, data: "app:eff-123:44136fa355b3678a" }
             }
           ]
         })

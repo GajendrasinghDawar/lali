@@ -1,0 +1,141 @@
+﻿commit 2758b22b5843aeea2edd581507adb3f91f3af2fb
+Author: Gajendrasingh Dawar <gajendrasinghdawar@gmail.com>
+Date:   Wed Sep 2 17:13:11 2026 +0530
+
+    feat: approve pending effects from Telegram
+
+diff --git a/src/gateway/notifications.test.ts b/src/gateway/notifications.test.ts
+index 15f7c2a..631f100 100644
+--- a/src/gateway/notifications.test.ts
++++ b/src/gateway/notifications.test.ts
+@@ -11,7 +11,7 @@ describe("Notifications", () => {
+     const id = NotificationManager.create({
+       type: "interrupted",
+       summary: "Run was interrupted by user",
+-      relatedSessionId: "session-1",
++      context: { sessionId: "session-1" },
+     });
+ 
+     const notif = db.prepare("SELECT * FROM notifications WHERE id = ?").get(id) as any;
+diff --git a/src/gateway/telegram.test.ts b/src/gateway/telegram.test.ts
+index 0ad55f8..e477b83 100644
+--- a/src/gateway/telegram.test.ts
++++ b/src/gateway/telegram.test.ts
+@@ -17,6 +17,7 @@ describe("Telegram Integration", () => {
+   let originalSetTimeout: any;
+   beforeEach(() => {
+     db.exec("DROP TABLE IF EXISTS telegram_state");
++    db.exec("DROP TABLE IF EXISTS effects");
+     vi.clearAllMocks();
+     process.env.TELEGRAM_BOT_TOKEN = "test-token";
+     process.env.TELEGRAM_OWNER_ID = "123456";
+@@ -67,4 +68,48 @@ describe("Telegram Integration", () => {
+       "main", "owner", "Hello", "tg_100", "telegram"
+     );
+   });
++
++  it("handles callback queries for effects", async () => {
++    db.exec(`
++      CREATE TABLE IF NOT EXISTS effects (
++        id TEXT PRIMARY KEY, sessionId TEXT, requestId TEXT, summary TEXT,
++        payload TEXT, digest TEXT, status TEXT, expires_at DATETIME
++      );
++    `);
++    db.prepare("INSERT INTO effects (id, sessionId, requestId, summary, payload, digest, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+1 hour'))")
++      .run("eff-123", "main", "req-1", "test effect", "{}", "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a", "pending");
++
++    let callCount = 0;
++    global.fetch = vi.fn().mockImplementation(async (url: string) => {
++      if (url.includes("answerCallbackQuery")) return { ok: true, json: async () => ({ ok: true }) };
++      if (url.includes("sendMessage")) return { ok: true };
++      callCount++;
++      if (callCount > 1) throw new Error("Force error to break loop");
++      return {
++        ok: true,
++        json: async () => ({
++          ok: true,
++          result: [
++            {
++              update_id: 101,
++              callback_query: { id: "cbq-1", from: { id: 123456 }, data: "app:eff-123" }
++            }
++          ]
++        })
++      };
++    }) as any;
++
++    let resolvePolling: any;
++    const pollingPromise = new Promise(r => resolvePolling = r);
++    global.setTimeout = vi.fn().mockImplementation(() => {
++      resolvePolling();
++      return new Promise(() => {});
++    }) as any;
++
++    initTelegram();
++    await pollingPromise;
++
++    const effect = db.prepare("SELECT status FROM effects WHERE id = 'eff-123'").get() as any;
++    expect(effect.status).toBe("executed");
++  });
+ });
+diff --git a/src/gateway/telegram.ts b/src/gateway/telegram.ts
+index 2e1be19..57f37d3 100644
+--- a/src/gateway/telegram.ts
++++ b/src/gateway/telegram.ts
+@@ -1,5 +1,6 @@
+ import { db } from "./auth.ts";
+ import { QueueManager, queueEvents } from "./queue.ts";
++import { EffectManager } from "./effects.ts";
+ import { NotificationManager, notificationEvents } from "./notifications.ts";
+ 
+ const MAX_TELEGRAM_LENGTH = 4000;
+@@ -56,6 +57,40 @@ async function startTelegramPolling() {
+       for (const update of data.result) {
+         offset = update.update_id + 1;
+ 
++        if (update.callback_query && update.callback_query.from.id === config.ownerId) {
++          const cbData = update.callback_query.data;
++          const action = cbData.substring(0, 4);
++          const effectId = cbData.substring(4);
++          
++          try {
++            const effect = db.prepare("SELECT digest, sessionId, requestId FROM effects WHERE id = ?").get(effectId) as { digest: string, sessionId: string, requestId: string } | undefined;
++            if (effect) {
++              if (action === "app:") {
++                EffectManager.approve(effectId, effect.digest);
++                const execResult = await EffectManager.execute(effectId);
++                QueueManager.submitRequest(effect.sessionId, "owner", JSON.stringify({ type: "effect_result", id: effectId, result: execResult }), "tg_app_" + update.callback_query.id, "telegram");
++              } else if (action === "rej:") {
++                const sessionId = EffectManager.reject(effectId);
++                QueueManager.submitRequest(sessionId, "owner", JSON.stringify({ type: "effect_result", id: effectId, result: { success: false, error: "Rejected by user" } }), "tg_rej_" + update.callback_query.id, "telegram");
++              }
++              // Answer callback query
++              await fetch(`https://api.telegram.org/bot${config.token}/answerCallbackQuery`, {
++                method: "POST",
++                headers: { "Content-Type": "application/json" },
++                body: JSON.stringify({ callback_query_id: update.callback_query.id, text: "Decision recorded" })
++              });
++            }
++          } catch (e) {
++             console.error("Effect decision failed:", e);
++             const errorMessage = e instanceof Error ? e.message : String(e);
++             await fetch(`https://api.telegram.org/bot${config.token}/answerCallbackQuery`, {
++                method: "POST",
++                headers: { "Content-Type": "application/json" },
++                body: JSON.stringify({ callback_query_id: update.callback_query.id, text: "Failed: " + errorMessage })
++              });
++          }
++        }
++
+         if (update.message && update.message.chat.type === "private") {
+           const fromId = update.message.from.id;
+           if (fromId === config.ownerId && update.message.text) {
+@@ -182,7 +217,7 @@ async function processNotificationDeliveries() {
+ 
+   try {
+     while (true) {
+-      const notif = db.prepare("SELECT id, summary, telegramStatus FROM notifications WHERE telegramStatus IN ('pending', 'retrying') LIMIT 1").get() as { id: string, summary: string, telegramStatus: string } | undefined;
++      const notif = db.prepare("SELECT id, summary, type, relatedEffectId, telegramStatus FROM notifications WHERE telegramStatus IN ('pending', 'retrying') LIMIT 1").get() as { id: string, summary: string, type: string, relatedEffectId: string, telegramStatus: string } | undefined;
+       if (!notif) break;
+ 
+       try {

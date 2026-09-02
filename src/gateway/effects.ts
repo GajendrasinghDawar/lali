@@ -38,6 +38,27 @@ export class EffectManager {
     return { id, sessionId, requestId, summary, payload: payloadStr, digest, status: "pending", expiresAt: expiresAt.expires_at };
   }
 
+  
+  static getShortDigest(id: string): string {
+    const effect = db.prepare("SELECT digest FROM effects WHERE id = ?").get(id) as { digest: string } | undefined;
+    return effect ? effect.digest.substring(0, 16) : "";
+  }
+
+  static approveFromTelegram(id: string, shortDigest: string) {
+    const effect = db.prepare("SELECT digest, sessionId FROM effects WHERE id = ?").get(id) as { digest: string, sessionId: string } | undefined;
+    if (!effect) throw new Error("Effect not found");
+    if (effect.digest.substring(0, 16) !== shortDigest) throw new Error("Digest mismatch");
+    EffectManager.approve(id, effect.digest);
+    return effect.sessionId;
+  }
+
+  static rejectFromTelegram(id: string, shortDigest: string) {
+    const effect = db.prepare("SELECT digest, sessionId FROM effects WHERE id = ?").get(id) as { digest: string, sessionId: string } | undefined;
+    if (!effect) throw new Error("Effect not found");
+    if (effect.digest.substring(0, 16) !== shortDigest) throw new Error("Digest mismatch");
+    return EffectManager.reject(id);
+  }
+
   static reject(id: string) {
     const effect = db.prepare("SELECT sessionId, status FROM effects WHERE id = ?").get(id) as { sessionId: string; status: string } | undefined;
     if (!effect) throw new Error("Effect not found");
