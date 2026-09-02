@@ -8,9 +8,9 @@ import { doubleCsrf } from "csrf-csrf";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 
-import { auth, db, checkAuthHealth, checkDbHealth } from "./auth";
+import { auth, db, checkAuthHealth, checkDbHealth } from "./auth.ts";
 import { toNodeHandler } from "better-auth/node";
-import { QueueManager, sseEmitters } from "./queue";
+import { QueueManager, sseEmitters } from "./queue.ts";
 
 const app = express();
 app.use(helmet());
@@ -75,7 +75,7 @@ app.get("/csrf-token", (req, res) => {
   res.json({ csrfToken: generateCsrfToken(req, res) });
 });
 
-app.use(express.static(path.join(__dirname, "../web")));
+app.use(express.static(path.join(import.meta.dirname, "../web")));
 
 app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { message, sessionId, idempotencyKey } = req.body;
@@ -134,9 +134,14 @@ app.get("/chat/events", apiLimiter, (req, res) => {
   });
 });
 
+app.use((req, res) => {
+  res.sendFile(path.join(import.meta.dirname, "../web/index.html"));
+});
+
 export { app, db };
 
-if (require.main === module) {
+import url from "node:url";
+if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
   const PORT = parseInt(process.env.PORT || "3000", 10);
   app.listen(PORT, "127.0.0.1", () => {
     console.log(`Gateway listening on 127.0.0.1:${PORT}`);

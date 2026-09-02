@@ -1,8 +1,9 @@
-import { db } from "./auth";
+import { db } from "./auth.ts";
 import crypto from "crypto";
 import * as net from "net";
 import * as os from "os";
-import { AgentEvent, AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol";
+import { AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol.ts";
+import type { AgentEvent } from "../shared/protocol.ts";
 
 // Setup schema
 db.exec(`

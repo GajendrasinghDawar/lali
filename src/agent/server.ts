@@ -1,8 +1,8 @@
 import * as net from "net";
 import * as os from "os";
-import { PiSession } from "./pi";
-import { AgentRequestSchema } from "../shared/protocol";
-import { applySocketUmask, restoreSocketUmask } from "./socket-permissions";
+import { PiSession } from "./pi.ts";
+import { AgentRequestSchema } from "../shared/protocol.ts";
+import { applySocketUmask, restoreSocketUmask } from "./socket-permissions.ts";
 
 const SOCKET_PATH = os.platform() === "win32" ? "\\\\.\\pipe\\lali-agent" : "/tmp/lali-agent.sock";
 
@@ -62,11 +62,14 @@ const server = net.createServer((socket) => {
   });
 });
 
-applySocketUmask();
-server.listen(SOCKET_PATH, () => {
-  restoreSocketUmask();
-  console.log(`Agent listening on ${SOCKET_PATH}`);
-});
+import url from "node:url";
+if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+  applySocketUmask();
+  server.listen(SOCKET_PATH, () => {
+    restoreSocketUmask();
+    console.log(`Agent listening on ${SOCKET_PATH}`);
+  });
+}
 
 process.on("SIGINT", () => {
   server.close();

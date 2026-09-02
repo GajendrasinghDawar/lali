@@ -7,12 +7,14 @@
     "doc": "docs"
   },
   "scripts": {
-    "dev:agent": "tsx src/agent/server.ts",
-    "dev:gateway": "tsx src/gateway/server.ts",
+    "start:agent": "node --permission --allow-fs-read=* --allow-fs-write=* --experimental-strip-types src/agent/server.ts",
+    "start:gateway": "node --permission --allow-fs-read=* --allow-fs-write=* --experimental-strip-types src/gateway/server.ts",
+    "dev:agent": "node --experimental-strip-types src/agent/server.ts",
+    "dev:gateway": "node --experimental-strip-types src/gateway/server.ts",
     "dev": "concurrently \"npm run dev:agent\" \"npm run dev:gateway\"",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "node --experimental-strip-types node_modules/vitest/vitest.mjs run"
   },
   "repository": {
     "type": "git",
@@ -21,7 +23,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/GajendrasinghDawar/lali/issues"
   },
@@ -34,7 +36,6 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
-    "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "uuid": "^14.0.2",
     "zod": "^4.5.4"
