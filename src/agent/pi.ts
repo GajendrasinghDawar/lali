@@ -33,6 +33,25 @@ export class PiSession extends EventEmitter {
       };
     }
 
+    
+    if (message.includes("publish pr") && !isEffectResult) {
+      this.emit("lifecycle", "proposing_effect");
+      return {
+        type: "effect",
+        summary: "Publish Pull Request to main",
+        payload: { 
+          action: "publish_pr", 
+          repo: "owner/repo", 
+          workspaceName: "default", 
+          branch: "feature-branch", 
+          commit_sha: "abcd123", 
+          destination_branch: "main", 
+          pr_title: "Add feature", 
+          pr_body: "This is a feature." 
+        }
+      };
+    }
+
     if (message.includes("send email to") && !isEffectResult) {
       this.emit("lifecycle", "proposing_effect");
       const matchTo = message.match(/to\s+([^\s,;]+)/i);

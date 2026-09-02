@@ -246,6 +246,38 @@ app.post("/api/emails/:id/open", doubleCsrfProtection, apiLimiter, (req, res) =>
   }
 });
 
+
+import { GitHubManager } from "./github.ts";
+
+app.use("/api/github", doubleCsrfProtection, apiLimiter, async (req, res) => {
+  try {
+    const endpoint = req.url; // Express router strips the prefix
+    const options = {
+      method: req.method,
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined
+    };
+    const data = await GitHubManager.fetchAPI(endpoint, options);
+    res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/api/workspaces/clone", doubleCsrfProtection, apiLimiter, async (req, res) => {
+  try {
+    QueueManager.assertSessionOwner("main", res.locals.userId);
+    const { repo, workspaceName } = req.body;
+    if (!repo || !workspaceName) return res.status(400).json({ error: "repo and workspaceName required" });
+    
+    await GitHubManager.cloneRepo(repo, workspaceName);
+    res.json({ success: true, workspaceName });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: message });
+  }
+});
+
 app.get("/api/emails", apiLimiter, (req, res) => {
   try {
     QueueManager.assertSessionOwner("main", res.locals.userId);

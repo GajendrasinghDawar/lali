@@ -1,5 +1,6 @@
 import { db } from "./auth.ts";
 import crypto from "crypto";
+import { GitHubManager } from "./github.ts";
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS effects (
@@ -136,6 +137,17 @@ export class EffectManager {
 
         const data = await res.json();
         execResult = { success: true, data, sessionId: effect.sessionId };
+      } else if (payload.action === "publish_pr") {
+        const pr = await GitHubManager.publishPR(
+          payload.repo,
+          payload.workspaceName,
+          payload.branch,
+          payload.commit_sha,
+          payload.destination_branch,
+          payload.pr_title,
+          payload.pr_body
+        );
+        execResult = { success: true, data: pr, sessionId: effect.sessionId };
       } else {
         execResult = { success: true, data: "Executed generic fake effect", sessionId: effect.sessionId };
       }
