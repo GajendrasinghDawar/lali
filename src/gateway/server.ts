@@ -226,21 +226,12 @@ app.use((req, res) => {
 export { app, db };
 
 import url from "node:url";
-import { startTelegramPolling, sendTelegramMessage } from "./telegram.ts";
+import { initTelegram } from "./telegram.ts";
 
 if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
   const PORT = parseInt(process.env.PORT || "3000", 10);
   app.listen(PORT, "127.0.0.1", () => {
     console.log(`Gateway listening on 127.0.0.1:${PORT}`);
-    
-    // Retry failed/pending telegram deliveries
-    const pendingDeliveries = db.prepare("SELECT id, finalResponse FROM requests WHERE replyChannel = 'telegram' AND (deliveryStatus = 'pending' OR deliveryStatus = 'failed')").all() as { id: string, finalResponse: string }[];
-    for (const req of pendingDeliveries) {
-      sendTelegramMessage(req.finalResponse).then(success => {
-        db.prepare("UPDATE requests SET deliveryStatus = ? WHERE id = ?").run(success ? "delivered" : "failed", req.id);
-      });
-    }
-
-    startTelegramPolling();
+    initTelegram();
   });
 }

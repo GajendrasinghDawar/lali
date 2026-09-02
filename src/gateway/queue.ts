@@ -5,6 +5,9 @@ import * as os from "os";
 import { AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol.ts";
 import type { AgentEvent } from "../shared/protocol.ts";
 import { EffectManager } from "./effects.ts";
+import { EventEmitter } from "events";
+
+export const queueEvents = new EventEmitter();
 
 // Setup schema
 db.exec(`
@@ -18,11 +21,6 @@ db.exec(`
     deliveryStatus TEXT DEFAULT 'none',
     finalResponse TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  
-  CREATE TABLE IF NOT EXISTS telegram_state (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    offset INTEGER NOT NULL DEFAULT 0
   );
   
   CREATE TABLE IF NOT EXISTS events (
@@ -99,6 +97,16 @@ function getAgentSocket(): Promise<net.Socket> {
 export class QueueManager {
   static assertSessionOwner(sessionId: string, userId: string) {
     const session = db.prepare("SELECT userId FROM session_state WHERE sessionId = ?").get(sessionId) as { userId: string } | undefined;
+    
+    // Allow seamless crossover for the telegram "owner" and the real Web UUID
+    if (session && session.userId === "owner" && userId !== "owner") {
+      db.prepare("UPDATE session_state SET userId = ? WHERE sessionId = ?").run(userId, sessionId);
+      return;
+    }
+    if (session && userId === "owner") {
+      return;
+    }
+
     if (session && session.userId !== userId) throw new Error("Unauthorized session access");
     if (!session) {
       db.prepare("INSERT INTO session_state (sessionId, userId) VALUES (?, ?)").run(sessionId, userId);
@@ -207,14 +215,8 @@ export class QueueManager {
           
           if (event.type === "done") {
             const req = db.prepare("SELECT replyChannel FROM requests WHERE id = ?").get(next.id) as { replyChannel: string };
-            if (req.replyChannel === "telegram") {
-              db.prepare("UPDATE requests SET deliveryStatus = 'pending' WHERE id = ?").run(next.id);
-              import("./telegram.ts").then(({ sendTelegramMessage }) => {
-                sendTelegramMessage(event.finalResponse).then(success => {
-                  db.prepare("UPDATE requests SET deliveryStatus = ? WHERE id = ?").run(success ? "delivered" : "failed", next.id);
-                });
-              }).catch(e => console.error("Failed to load telegram module", e));
-            }
+            db.prepare("UPDATE requests SET deliveryStatus = 'pending' WHERE id = ?").run(next.id);
+            queueEvents.emit("request_completed", { id: next.id, replyChannel: req.replyChannel, finalResponse: event.finalResponse });
           }
           
           setTimeout(() => QueueManager.processQueue(sessionId), 0);

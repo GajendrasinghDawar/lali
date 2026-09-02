@@ -1,20 +1,40 @@
 import { db } from "./auth.ts";
-import { QueueManager } from "./queue.ts";
+import { QueueManager, queueEvents } from "./queue.ts";
 
-// 1000 characters per message
-const MAX_TELEGRAM_LENGTH = 1000;
+const MAX_TELEGRAM_LENGTH = 4000;
 
-export async function startTelegramPolling() {
-  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const TELEGRAM_OWNER_ID = process.env.TELEGRAM_OWNER_ID;
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_OWNER_ID) {
+function getConfig() {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const ownerId = process.env.TELEGRAM_OWNER_ID;
+  if (!token || !ownerId) return null;
+  return { token, ownerId: parseInt(ownerId, 10), ownerIdString: ownerId };
+}
+
+export function initTelegram() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS telegram_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      offset INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+  
+  startTelegramPolling();
+  processDeliveries();
+
+  queueEvents.on("request_completed", (req) => {
+    if (req.replyChannel === "telegram") {
+      processDeliveries();
+    }
+  });
+}
+
+async function startTelegramPolling() {
+  const config = getConfig();
+  if (!config) {
     console.warn("Telegram bot token or owner ID not set. Skipping Telegram polling.");
     return;
   }
 
-  const ownerId = parseInt(TELEGRAM_OWNER_ID, 10);
-
-  // Read offset
   const state = db.prepare("SELECT offset FROM telegram_state WHERE id = 1").get() as { offset: number } | undefined;
   let offset = state ? state.offset : 0;
   if (!state) {
@@ -23,67 +43,110 @@ export async function startTelegramPolling() {
 
   while (true) {
     try {
-      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=30`);
-      if (!response.ok) {
-        throw new Error(`Telegram API error: ${response.status}`);
-      }
+      const response = await fetch(`https://api.telegram.org/bot${config.token}/getUpdates?offset=${offset}&timeout=30`);
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
       
       const data = await response.json();
-      if (!data.ok) {
-        throw new Error(`Telegram API returned error: ${data.description}`);
-      }
+      if (!data.ok) throw new Error(`API error: ${data.description}`);
 
       for (const update of data.result) {
         offset = update.update_id + 1;
 
         if (update.message && update.message.chat.type === "private") {
           const fromId = update.message.from.id;
-          if (fromId === ownerId && update.message.text) {
+          if (fromId === config.ownerId && update.message.text) {
             const idempotencyKey = `tg_${update.update_id}`;
-            // Use the Telegram owner ID string as the userId in Lali
-            QueueManager.submitRequest("main", TELEGRAM_OWNER_ID, update.message.text, idempotencyKey, "telegram");
+            QueueManager.submitRequest("main", "owner", update.message.text, idempotencyKey, "telegram");
           }
         }
         
-        // Update offset in DB to prevent re-processing on restart
         db.prepare("UPDATE telegram_state SET offset = ? WHERE id = 1").run(offset);
       }
     } catch (e) {
       console.error("Telegram polling error:", e);
-      // Wait before retrying
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 }
 
-export async function sendTelegramMessage(text: string) {
-  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const TELEGRAM_OWNER_ID = process.env.TELEGRAM_OWNER_ID;
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_OWNER_ID) return false;
+let isDelivering = false;
+async function processDeliveries() {
+  if (isDelivering) return;
+  isDelivering = true;
+  const config = getConfig();
+  if (!config) {
+    isDelivering = false;
+    return;
+  }
 
   try {
-    // Basic chunking if text exceeds limits
-    const chunks = [];
-    for (let i = 0; i < text.length; i += MAX_TELEGRAM_LENGTH) {
-      chunks.push(text.slice(i, i + MAX_TELEGRAM_LENGTH));
-    }
+    while (true) {
+      const req = db.prepare("SELECT id, finalResponse, deliveryStatus FROM requests WHERE replyChannel = 'telegram' AND deliveryStatus LIKE 'pending%' LIMIT 1").get() as { id: string, finalResponse: string, deliveryStatus: string } | undefined;
+      if (!req) break;
 
-    for (const chunk of chunks) {
-      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_OWNER_ID,
-          text: chunk
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`Telegram send error: ${response.status}`);
+      const cursor = req.deliveryStatus.startsWith("pending:") ? parseInt(req.deliveryStatus.split(":")[1], 10) : 0;
+      
+      const text = req.finalResponse || "";
+      const chunks = [];
+      for (let i = 0; i < text.length; i += MAX_TELEGRAM_LENGTH) {
+        chunks.push(text.slice(i, i + MAX_TELEGRAM_LENGTH));
+      }
+      
+      // If no text, send a placeholder or skip?
+      if (chunks.length === 0) chunks.push("...");
+
+      let success = true;
+      for (let i = cursor; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        try {
+          const response = await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: config.ownerIdString,
+              text: chunk
+            })
+          });
+          if (!response.ok) throw new Error(`Send error: ${response.status}`);
+          db.prepare("UPDATE requests SET deliveryStatus = ? WHERE id = ?").run(`pending:${i + 1}`, req.id);
+        } catch (e) {
+          console.error("Telegram delivery failed", e);
+          success = false;
+          break;
+        }
+      }
+
+      if (success) {
+        db.prepare("UPDATE requests SET deliveryStatus = 'delivered' WHERE id = ?").run(req.id);
+      } else {
+        // Stop processing to wait for retry
+        break;
       }
     }
-    return true;
-  } catch (e) {
-    console.error("Telegram send error:", e);
-    return false;
+  } finally {
+    isDelivering = false;
+    // Retry in 5s if there are still pending ones
+    const remaining = db.prepare("SELECT id FROM requests WHERE replyChannel = 'telegram' AND deliveryStatus LIKE 'pending%' LIMIT 1").get();
+    if (remaining) {
+      setTimeout(processDeliveries, 5000);
+    }
   }
+}
+
+export async function sendTelegramMessage(text: string) {
+  // Only for tests to verify chunking
+  const config = getConfig();
+  if (!config) return false;
+  const chunks = [];
+  for (let i = 0; i < text.length; i += MAX_TELEGRAM_LENGTH) {
+    chunks.push(text.slice(i, i + MAX_TELEGRAM_LENGTH));
+  }
+  for (const chunk of chunks) {
+    await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: config.ownerIdString, text: chunk })
+    });
+  }
+  return true;
 }

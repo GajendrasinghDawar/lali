@@ -13,7 +13,7 @@
     "dev:gateway": "node --experimental-strip-types src/gateway/server.ts",
     "dev": "concurrently \"npm run dev:agent\" \"npm run dev:gateway\"",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types node_modules/vitest/vitest.mjs run"
+    "test": "vitest run --fileParallelism false"
   },
   "repository": {
     "type": "git",
