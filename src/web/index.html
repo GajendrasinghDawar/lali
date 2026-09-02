@@ -30,7 +30,13 @@
     </div>
   </div>
   
+  
   <div id="chat"></div>
+  <div id="notifications-panel" style="border: 1px solid red; padding: 10px; margin-bottom: 10px; display: none;">
+    <h3>Notifications</h3>
+    <ul id="notifications-list"></ul>
+  </div>
+
   <form id="form">
     <input type="text" id="input" style="width: 80%;" placeholder="Type a message..." required />
     <button type="submit">Send</button>
@@ -62,8 +68,52 @@
       const res = await fetch('/csrf-token');
       const data = await res.json();
       csrfToken = data.csrfToken;
+      fetchNotifications();
     }
     init();
+
+    
+    async function fetchNotifications() {
+      try {
+        const res = await fetch('/api/notifications');
+        const data = await res.json();
+        if (data.notifications && data.notifications.length > 0) {
+          document.getElementById('notifications-panel').style.display = 'block';
+          const list = document.getElementById('notifications-list');
+          list.innerHTML = '';
+          for (const n of data.notifications) {
+            if (n.status === 'read') continue;
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <strong>[${n.type}]</strong> ${n.summary} <em>(${new Date(n.created_at).toLocaleString()})</em>
+              <button onclick="markNotificationRead('${n.id}')">Dismiss</button>
+            `;
+            list.appendChild(li);
+          }
+          if (list.children.length === 0) {
+             document.getElementById('notifications-panel').style.display = 'none';
+          }
+        } else {
+          document.getElementById('notifications-panel').style.display = 'none';
+        }
+      } catch (err) {
+        console.error('Failed to fetch notifications', err);
+      }
+    }
+
+    async function markNotificationRead(id) {
+      try {
+        await fetch(`/api/notifications/${id}/read`, {
+          method: 'POST',
+          headers: { 'x-csrf-token': csrfToken }
+        });
+        fetchNotifications();
+      } catch (err) {
+        console.error('Failed to mark notification read', err);
+      }
+    }
+
+    setInterval(fetchNotifications, 5000);
 
     async function fetchPendingEffects() {
       const res = await fetch(`/effects/pending?sessionId=${sessionId}`);

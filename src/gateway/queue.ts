@@ -189,6 +189,7 @@ export class QueueManager {
     
     // Broadcast interrupt
     QueueManager.appendEvent(sessionId, "system", "interrupted", { message: "Run interrupted" });
+    queueEvents.emit("interrupted", { sessionId });
   }
 
   static resumeSession(sessionId: string) {
@@ -260,6 +261,8 @@ export class QueueManager {
             const req = db.prepare("SELECT replyChannel FROM requests WHERE id = ?").get(next.id) as { replyChannel: string };
             db.prepare("UPDATE requests SET deliveryStatus = 'pending' WHERE id = ?").run(next.id);
             queueEvents.emit("request_completed", { id: next.id, replyChannel: req.replyChannel, finalResponse: event.finalResponse });
+          } else if (event.type === "error") {
+            queueEvents.emit("agent_error", { sessionId, requestId: next.id, error: event.error });
           }
           
           setTimeout(() => QueueManager.processQueue(sessionId), 0);
@@ -268,6 +271,7 @@ export class QueueManager {
           responseEmitters.delete(next.id);
           const effect = EffectManager.propose(sessionId, next.id, event.summary, event.payload);
           QueueManager.appendEvent(sessionId, next.id, "propose_effect", { effect });
+          queueEvents.emit("effect_proposed", { sessionId, requestId: next.id, effect, summary: event.summary });
           setTimeout(() => QueueManager.processQueue(sessionId), 0);
         } else if (event.type === "text") {
           QueueManager.appendEvent(sessionId, next.id, "text", { text: event.text });
@@ -282,6 +286,7 @@ export class QueueManager {
     } catch (err) {
       db.prepare("UPDATE requests SET status = 'failed' WHERE id = ?").run(next.id);
       QueueManager.appendEvent(sessionId, next.id, "error", { error: "Agent connection failed" });
+      queueEvents.emit("agent_error", { sessionId, requestId: next.id, error: "Agent connection failed" });
       setTimeout(() => QueueManager.processQueue(sessionId), 0);
     }
   }

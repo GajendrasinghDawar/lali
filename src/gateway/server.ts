@@ -12,6 +12,7 @@ import { auth, db, checkAuthHealth, checkDbHealth } from "./auth.ts";
 import { toNodeHandler } from "better-auth/node";
 import { QueueManager, sseEmitters } from "./queue.ts";
 import { EffectManager } from "./effects.ts";
+import { NotificationManager, initNotifications } from "./notifications.ts";
 
 function getWorkspaces(): Record<string, string> {
   const workspaces: Record<string, string> = {};
@@ -26,6 +27,7 @@ function getWorkspaces(): Record<string, string> {
 }
 
 const app = express();
+initNotifications();
 app.use(helmet());
 app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser(process.env.COOKIE_SECRET || "lali-secret"));
@@ -87,6 +89,29 @@ app.use(async (req, res, next) => {
 app.get("/csrf-token", (req, res) => {
   res.json({ csrfToken: generateCsrfToken(req, res) });
 });
+
+app.get("/api/notifications", apiLimiter, (req, res) => {
+  try {
+    QueueManager.assertSessionOwner("main", res.locals.userId);
+    const notifications = NotificationManager.list();
+    res.json({ notifications });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
+  }
+});
+
+app.post("/api/notifications/:id/read", doubleCsrfProtection, apiLimiter, (req, res) => {
+  try {
+    QueueManager.assertSessionOwner("main", res.locals.userId);
+    NotificationManager.markRead(req.params.id as string);
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
+  }
+});
+
 
 app.get("/api/sessions", apiLimiter, (req, res) => {
   const sessions = db.prepare("SELECT * FROM session_state WHERE userId = ? OR userId = 'owner' ORDER BY type ASC, sessionId ASC").all(res.locals.userId);
