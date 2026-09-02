@@ -46,6 +46,7 @@ describe("Gateway API", () => {
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send(payload);
+    if (res1.status !== 202) console.error(res1.body);
     expect(res1.status).toBe(202);
 
     // Second request with same key

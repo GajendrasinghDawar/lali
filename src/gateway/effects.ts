@@ -15,6 +15,9 @@ db.exec(`
   );
 `);
 
+// Reset interrupted executions
+db.exec("UPDATE effects SET status = 'unknown' WHERE status = 'running'");
+
 export class EffectManager {
   static propose(sessionId: string, requestId: string, summary: string, payload: unknown) {
     const id = crypto.randomUUID();
@@ -24,16 +27,15 @@ export class EffectManager {
     const hash = crypto.createHash('sha256');
     hash.update(payloadStr);
     const digest = hash.digest('hex');
-
-    // Expires in 15 minutes
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
     
     db.prepare(`
       INSERT INTO effects (id, sessionId, requestId, summary, payload, digest, status, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
-    `).run(id, sessionId, requestId, summary, payloadStr, digest, expiresAt);
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', datetime('now', '+15 minutes'))
+    `).run(id, sessionId, requestId, summary, payloadStr, digest);
 
-    return { id, sessionId, requestId, summary, payload: payloadStr, digest, status: "pending", expiresAt };
+    const expiresAt = db.prepare("SELECT expires_at FROM effects WHERE id = ?").get(id) as { expires_at: string };
+    
+    return { id, sessionId, requestId, summary, payload: payloadStr, digest, status: "pending", expiresAt: expiresAt.expires_at };
   }
 
   static reject(id: string) {
@@ -57,7 +59,9 @@ export class EffectManager {
       if (!effect) throw new Error("Effect not found");
       if (effect.status !== "pending") throw new Error("Effect is not pending");
       if (effect.digest !== digest) throw new Error("Digest mismatch");
-      if (new Date(effect.expires_at) <= new Date()) {
+      
+      const isExpired = db.prepare("SELECT 1 FROM effects WHERE id = ? AND expires_at <= datetime('now')").get(id);
+      if (isExpired) {
         db.prepare("UPDATE effects SET status = 'expired' WHERE id = ?").run(id);
         throw new Error("Effect expired");
       }
@@ -66,20 +70,34 @@ export class EffectManager {
   }
 
   static async execute(id: string) {
-    // Attempt to transition to executed atomically to prevent double execution
-    const result = db.prepare("UPDATE effects SET status = 'executed' WHERE id = ? AND status = 'approved'").run(id);
+    const effect = db.prepare("SELECT payload, digest, sessionId FROM effects WHERE id = ?").get(id) as { payload: string; digest: string; sessionId: string } | undefined;
+    if (!effect) throw new Error("Effect not found");
+
+    const hash = crypto.createHash('sha256');
+    hash.update(effect.payload);
+    const currentDigest = hash.digest('hex');
+    if (currentDigest !== effect.digest) {
+      db.prepare("UPDATE effects SET status = 'failed' WHERE id = ?").run(id);
+      throw new Error("Payload tampered in database");
+    }
+
+    // Transition to running atomically
+    const result = db.prepare("UPDATE effects SET status = 'running' WHERE id = ? AND status = 'approved'").run(id);
     if (result.changes === 0) {
       throw new Error("Effect not approved or already executed");
     }
 
-    const effect = db.prepare("SELECT payload, sessionId FROM effects WHERE id = ?").get(id) as { payload: string; sessionId: string };
     const payload = JSON.parse(effect.payload);
 
+    let execResult;
     // Fake execution logic
     if (payload.action === "fake_transfer") {
-      return { success: true, data: `Executed ${payload.action} with amount ${payload.amount}`, sessionId: effect.sessionId };
+      execResult = { success: true, data: `Executed ${payload.action} with amount ${payload.amount}`, sessionId: effect.sessionId };
+    } else {
+      execResult = { success: true, data: "Executed generic fake effect", sessionId: effect.sessionId };
     }
-
-    return { success: true, data: "Executed generic fake effect", sessionId: effect.sessionId };
+    
+    db.prepare("UPDATE effects SET status = 'executed' WHERE id = ?").run(id);
+    return execResult;
   }
 }

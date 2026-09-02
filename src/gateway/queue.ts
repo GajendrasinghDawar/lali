@@ -28,6 +28,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS session_state (
     sessionId TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
     is_paused BOOLEAN DEFAULT 0
   );
 `);
@@ -88,7 +89,17 @@ function getAgentSocket(): Promise<net.Socket> {
 }
 
 export class QueueManager {
-  static submitRequest(sessionId: string, message: string, idempotencyKey?: string) {
+  static assertSessionOwner(sessionId: string, userId: string) {
+    const session = db.prepare("SELECT userId FROM session_state WHERE sessionId = ?").get(sessionId) as { userId: string } | undefined;
+    if (session && session.userId !== userId) throw new Error("Unauthorized session access");
+    if (!session) {
+      db.prepare("INSERT INTO session_state (sessionId, userId) VALUES (?, ?)").run(sessionId, userId);
+    }
+  }
+
+  static submitRequest(sessionId: string, userId: string, message: string, idempotencyKey?: string) {
+    QueueManager.assertSessionOwner(sessionId, userId);
+
     if (idempotencyKey) {
       const existing = db.prepare("SELECT * FROM requests WHERE sessionId = ? AND idempotencyKey = ?").get(sessionId, idempotencyKey) as { id: string, status: string } | undefined;
       if (existing) {

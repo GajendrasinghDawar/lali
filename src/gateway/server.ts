@@ -82,37 +82,63 @@ app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { message, sessionId, idempotencyKey } = req.body;
   if (!message || !sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "Message and sessionId required" });
 
-  const request = QueueManager.submitRequest(sessionId, message, idempotencyKey);
-  res.status(202).json({ requestId: request.id, status: request.status });
+  try {
+    const request = QueueManager.submitRequest(sessionId, res.locals.userId, message, idempotencyKey);
+    res.status(202).json({ requestId: request.id, status: request.status });
+  } catch (err: any) {
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  }
 });
 
 app.post("/chat/interrupt", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
   
-  QueueManager.interruptSession(sessionId);
-  res.json({ success: true });
+  try {
+    QueueManager.assertSessionOwner(sessionId, res.locals.userId);
+    QueueManager.interruptSession(sessionId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  }
 });
 
 app.post("/chat/resume", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
   
-  QueueManager.resumeSession(sessionId);
-  res.json({ success: true });
+  try {
+    QueueManager.assertSessionOwner(sessionId, res.locals.userId);
+    QueueManager.resumeSession(sessionId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  }
 });
 
 app.post("/chat/clear", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
   
-  QueueManager.clearSession(sessionId);
-  res.json({ success: true });
+  try {
+    QueueManager.assertSessionOwner(sessionId, res.locals.userId);
+    QueueManager.clearSession(sessionId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  }
 });
 
 app.get("/effects/pending", apiLimiter, (req, res) => {
   const sessionId = req.query.sessionId as string;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST" });
+  
+  try {
+    QueueManager.assertSessionOwner(sessionId, res.locals.userId);
+  } catch (err: any) {
+    return res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  }
+
   const pending = db.prepare("SELECT * FROM effects WHERE sessionId = ? AND status = 'pending'").all(sessionId);
   res.json({ effects: pending });
 });
@@ -121,11 +147,15 @@ app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, r
   const id = req.params.id as string;
   const digest = req.body.digest as string;
   try {
+    const effect = db.prepare("SELECT sessionId FROM effects WHERE id = ?").get(id) as { sessionId: string } | undefined;
+    if (!effect) return res.status(404).json({ error: "Not found" });
+    QueueManager.assertSessionOwner(effect.sessionId, res.locals.userId);
+
     EffectManager.approve(id, digest);
     const result = await EffectManager.execute(id);
     
     // Submit the result as a new request back to the agent so it can resume
-    QueueManager.submitRequest(result.sessionId, JSON.stringify({
+    QueueManager.submitRequest(result.sessionId, res.locals.userId, JSON.stringify({
       type: "effect_result",
       id,
       result: { success: result.success, data: result.data }
@@ -140,9 +170,13 @@ app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, r
 app.post("/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => {
   const id = req.params.id as string;
   try {
+    const effect = db.prepare("SELECT sessionId FROM effects WHERE id = ?").get(id) as { sessionId: string } | undefined;
+    if (!effect) return res.status(404).json({ error: "Not found" });
+    QueueManager.assertSessionOwner(effect.sessionId, res.locals.userId);
+
     const sessionId = EffectManager.reject(id);
     
-    QueueManager.submitRequest(sessionId, JSON.stringify({
+    QueueManager.submitRequest(sessionId, res.locals.userId, JSON.stringify({
       type: "effect_result",
       id,
       result: { success: false, error: "Rejected by user" }
@@ -158,6 +192,12 @@ app.get("/chat/events", apiLimiter, (req, res) => {
   const sessionId = req.query.sessionId as string;
   const after = parseInt(req.query.after as string || "0", 10);
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
+
+  try {
+    QueueManager.assertSessionOwner(sessionId, res.locals.userId);
+  } catch (err: any) {
+    return res.status(403).json({ error: "ERR_UNAUTHORIZED", message: err.message });
+  }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
