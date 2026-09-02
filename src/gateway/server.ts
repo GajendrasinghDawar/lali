@@ -1,5 +1,4 @@
-import dotenv from "dotenv";
-dotenv.config();
+try { process.loadEnvFile(); } catch (e) {}
 
 import express from "express";
 import path from "path";

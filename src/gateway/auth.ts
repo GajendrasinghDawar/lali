@@ -1,8 +1,6 @@
 import { betterAuth } from "better-auth";
-import Database from "better-sqlite3";
-import dotenv from "dotenv";
-
-dotenv.config();
+import { DatabaseSync as Database } from "node:sqlite";
+try { process.loadEnvFile(); } catch (e) {}
 
 export const db = new Database("gateway.db");
 

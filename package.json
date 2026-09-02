@@ -29,10 +29,8 @@
   "dependencies": {
     "@types/node": "^26.4.0",
     "better-auth": "^1.7.2",
-    "better-sqlite3": "^13.0.3",
     "cookie-parser": "^1.4.7",
     "csrf-csrf": "^4.0.3",
-    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
@@ -42,7 +40,6 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/supertest": "^7.2.1",
