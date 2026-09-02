@@ -1,24 +1,51 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
-// Mock the openai module before importing PiSession
-vi.mock("openai", () => {
-  class MockAzureOpenAI {
-    chat = {
-      completions: {
-        create: vi.fn().mockImplementation(async () => {
-          // Return an async iterable that yields chunks
-          const chunks = [
-            { choices: [{ delta: { content: "Hello" } }] },
-            { choices: [{ delta: { content: " there" } }] },
-          ];
-          return (async function* () {
-            for (const chunk of chunks) yield chunk;
-          })();
-        }),
-      },
-    };
-  }
-  return { AzureOpenAI: MockAzureOpenAI };
+vi.mock("@earendil-works/pi-ai", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    // We don't strictly need to mock the entire lib if we mock the models collection
+  };
+});
+
+vi.mock("@earendil-works/pi-ai/providers/all", () => {
+  return {
+    builtinModels: () => ({
+      getModel: () => ({ id: "mock-model", provider: "mock-provider" }),
+      stream: (model: any, context: any, options: any) => {
+        const events = [
+          { type: "start", partial: { model: "mock-model" } },
+          { type: "text_start" },
+          { type: "text_delta", delta: "Hello" },
+          { type: "text_delta", delta: " there" },
+          { type: "text_end" },
+          { type: "done", reason: "stop" }
+        ];
+        
+        let i = 0;
+        const stream = {
+          [Symbol.asyncIterator]() {
+            return {
+              async next() {
+                if (i < events.length) {
+                  return { value: events[i++], done: false };
+                }
+                return { value: undefined, done: true };
+              }
+            };
+          },
+          async result() {
+            return {
+              role: "assistant",
+              content: [{ type: "text", text: "Hello there" }],
+              timestamp: Date.now()
+            };
+          }
+        };
+        return stream;
+      }
+    })
+  };
 });
 
 import { PiSession } from "./pi.ts";

@@ -57,7 +57,7 @@ const { doubleCsrfProtection, generateCsrfToken } = doubleCsrf({
   }
 });
 
-const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10000 });
 
 app.use((req, res, next) => {
   res.locals.correlationId = crypto.randomUUID();
