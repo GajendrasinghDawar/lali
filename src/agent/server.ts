@@ -2,6 +2,7 @@ import * as net from "net";
 import * as os from "os";
 import { PiSession } from "./pi";
 import { AgentRequestSchema } from "../shared/protocol";
+import { applySocketUmask, restoreSocketUmask } from "./socket-permissions";
 
 const SOCKET_PATH = os.platform() === "win32" ? "\\\\.\\pipe\\lali-agent" : "/tmp/lali-agent.sock";
 
@@ -61,16 +62,9 @@ const server = net.createServer((socket) => {
   });
 });
 
+applySocketUmask();
 server.listen(SOCKET_PATH, () => {
-  if (os.platform() !== "win32") {
-    try {
-      // Allow user (lali) and group (lali) read/write
-      const fs = require("fs");
-      fs.chmodSync(SOCKET_PATH, 0o660);
-    } catch (e) {
-      console.warn("Could not set socket permissions:", e);
-    }
-  }
+  restoreSocketUmask();
   console.log(`Agent listening on ${SOCKET_PATH}`);
 });
 

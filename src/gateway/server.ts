@@ -9,7 +9,7 @@ import { doubleCsrf } from "csrf-csrf";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 
-import { auth, db } from "./auth";
+import { auth, db, checkAuthHealth, checkDbHealth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { QueueManager, sseEmitters } from "./queue";
 
@@ -41,15 +41,17 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (req, res) => {
-  if (!process.env.GITHUB_CLIENT_ID || !process.env.OWNER_GITHUB_ID || !process.env.BETTER_AUTH_SECRET) {
-    return res.status(503).json({ status: "error", message: "Missing auth configuration" });
+  const authHealth = checkAuthHealth();
+  if (authHealth.status !== "ok") {
+    return res.status(503).json(authHealth);
   }
-  try {
-    db.prepare("SELECT 1 FROM requests LIMIT 1").get();
-    res.json({ status: "ok" });
-  } catch (err) {
-    res.status(503).json({ status: "error", message: "Database not ready" });
+  
+  const dbHealth = checkDbHealth();
+  if (dbHealth.status !== "ok") {
+    return res.status(503).json(dbHealth);
   }
+  
+  res.json({ status: "ok" });
 });
 
 app.use(async (req, res, next) => {
@@ -136,8 +138,8 @@ app.get("/chat/events", apiLimiter, (req, res) => {
 export { app, db };
 
 if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`Gateway listening on port ${PORT}`);
+  const PORT = parseInt(process.env.PORT || "3000", 10);
+  app.listen(PORT, "127.0.0.1", () => {
+    console.log(`Gateway listening on 127.0.0.1:${PORT}`);
   });
 }

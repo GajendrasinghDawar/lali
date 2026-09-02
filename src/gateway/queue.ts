@@ -2,7 +2,7 @@ import { db } from "./auth";
 import crypto from "crypto";
 import * as net from "net";
 import * as os from "os";
-import { AgentEventSchema } from "../shared/protocol";
+import { AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol";
 
 // Setup schema
 db.exec(`
@@ -191,7 +191,7 @@ export class QueueManager {
         }
       });
 
-      socket.write(JSON.stringify({ version: 1, requestId: next.id, message: next.message }) + "\n");
+      socket.write(JSON.stringify({ version: PROTOCOL_VERSION, requestId: next.id, message: next.message }) + "\n");
     } catch (err) {
       db.prepare("UPDATE requests SET status = 'failed' WHERE id = ?").run(next.id);
       QueueManager.appendEvent(sessionId, next.id, "error", { error: "Agent connection failed" });

@@ -30,3 +30,19 @@ export const auth = betterAuth({
     useSecureCookies: process.env.NODE_ENV === "production"
   }
 });
+
+export function checkAuthHealth(): { status: "ok" | "error"; message?: string } {
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.OWNER_GITHUB_ID || !process.env.BETTER_AUTH_SECRET) {
+    return { status: "error", message: "Missing auth configuration" };
+  }
+  return { status: "ok" };
+}
+
+export function checkDbHealth(): { status: "ok" | "error"; message?: string } {
+  try {
+    db.prepare("SELECT 1").get();
+    return { status: "ok" };
+  } catch (err) {
+    return { status: "error", message: "Database not ready" };
+  }
+}
