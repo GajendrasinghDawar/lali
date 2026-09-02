@@ -37,10 +37,15 @@ export class EffectManager {
   }
 
   static reject(id: string) {
+    const effect = db.prepare("SELECT sessionId, status FROM effects WHERE id = ?").get(id) as { sessionId: string; status: string } | undefined;
+    if (!effect) throw new Error("Effect not found");
+    if (effect.status !== "pending") throw new Error("Effect is not pending");
+
     const result = db.prepare("UPDATE effects SET status = 'rejected' WHERE id = ? AND status = 'pending'").run(id);
     if (result.changes === 0) {
-      throw new Error("Effect not found or not in pending state");
+      throw new Error("Failed to reject effect");
     }
+    return effect.sessionId;
   }
 
   static approve(id: string, digest: string) {
@@ -67,14 +72,14 @@ export class EffectManager {
       throw new Error("Effect not approved or already executed");
     }
 
-    const effect = db.prepare("SELECT payload FROM effects WHERE id = ?").get(id) as { payload: string };
+    const effect = db.prepare("SELECT payload, sessionId FROM effects WHERE id = ?").get(id) as { payload: string; sessionId: string };
     const payload = JSON.parse(effect.payload);
 
     // Fake execution logic
     if (payload.action === "fake_transfer") {
-      return { success: true, data: `Executed ${payload.action} with amount ${payload.amount}` };
+      return { success: true, data: `Executed ${payload.action} with amount ${payload.amount}`, sessionId: effect.sessionId };
     }
 
-    return { success: true, data: "Executed generic fake effect" };
+    return { success: true, data: "Executed generic fake effect", sessionId: effect.sessionId };
   }
 }

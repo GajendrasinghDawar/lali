@@ -123,13 +123,12 @@ app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, r
   try {
     EffectManager.approve(id, digest);
     const result = await EffectManager.execute(id);
-    const effect = db.prepare("SELECT sessionId FROM effects WHERE id = ?").get(id) as any;
     
     // Submit the result as a new request back to the agent so it can resume
-    QueueManager.submitRequest(effect.sessionId, JSON.stringify({
+    QueueManager.submitRequest(result.sessionId, JSON.stringify({
       type: "effect_result",
       id,
-      result
+      result: { success: result.success, data: result.data }
     }));
     
     res.json({ success: true, result });
@@ -141,10 +140,9 @@ app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, r
 app.post("/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => {
   const id = req.params.id as string;
   try {
-    EffectManager.reject(id);
-    const effect = db.prepare("SELECT sessionId FROM effects WHERE id = ?").get(id) as any;
+    const sessionId = EffectManager.reject(id);
     
-    QueueManager.submitRequest(effect.sessionId, JSON.stringify({
+    QueueManager.submitRequest(sessionId, JSON.stringify({
       type: "effect_result",
       id,
       result: { success: false, error: "Rejected by user" }
