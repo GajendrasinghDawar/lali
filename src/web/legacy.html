@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lali Web Client</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
+    #chat { border: 1px solid #ccc; padding: 1rem; height: 300px; overflow-y: auto; margin-bottom: 1rem; }
+    .message { margin-bottom: 0.5rem; }
+    .user { font-weight: bold; color: blue; }
+    .agent { font-weight: bold; color: green; }
+    .lifecycle { color: gray; font-size: 0.8em; font-style: italic; }
+    .controls { display: flex; justify-content: space-between; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <h1>Lali</h1>
+    <div id="auth-controls">
+      <button onclick="loginGitHub()">Login with GitHub</button>
+    </div>
+  </div>
+  
+  <div class="controls">
+    <div>
+      <button onclick="interruptSession()">Interrupt</button>
+      <button onclick="resumeSession()">Resume Queued</button>
+      <button onclick="clearSession()">Clear Queue</button>
+      <button onclick="checkEmails()">Check Mail</button>
+      <button onclick="loadEmails()">Inbox</button>
+    </div>
+  </div>
+  
+  
+  <div id="chat"></div>
+  
+  <div id="emails-panel" style="border: 1px solid blue; padding: 10px; margin-bottom: 10px; display: none;">
+    <h3>Inbox</h3>
+    <ul id="emails-list"></ul>
+  </div>
+
+  <div id="notifications-panel" style="border: 1px solid red; padding: 10px; margin-bottom: 10px; display: none;"> style="border: 1px solid red; padding: 10px; margin-bottom: 10px; display: none;">
+    <h3>Notifications</h3>
+    <ul id="notifications-list"></ul>
+  </div>
+
+  <form id="form">
+    <input type="file" id="fileInput" multiple style="display: none;" />
+    <button type="button" onclick="document.getElementById('fileInput').click()">📎</button>
+    <div id="filePreview" style="display: inline-block; font-size: 0.8em; margin-right: 5px;"></div>
+    <input type="text" id="input" style="width: 70%;" placeholder="Type a message..." />
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    const sessionId = "main";
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const chat = document.getElementById('chat');
+    const authControls = document.getElementById('auth-controls');
+
+    let csrfToken = '';
+    async function init() {
+      try {
+        const sessionRes = await fetch('/api/auth/get-session');
+        const sessionData = await sessionRes.json();
+        
+        if (sessionData && sessionData.session) {
+          authControls.innerHTML = `
+            <span>Logged in</span>
+            <button onclick="logout()">Logout</button>
+            <button onclick="logoutAll()">Revoke All</button>
+          `;
+        }
+      } catch (err) {
+        console.error('Not logged in', err);
+      }
+
+      const res = await fetch('/csrf-token');
+      const data = await res.json();
+      csrfToken = data.csrfToken;
+      fetchNotifications();
+    }
+    init();
+
+    
+    async function fetchNotifications() {
+      try {
+        const res = await fetch('/api/notifications');
+        const data = await res.json();
+        if (data.notifications && data.notifications.length > 0) {
+          document.getElementById('notifications-panel').style.display = 'block';
+          const list = document.getElementById('notifications-list');
+          list.innerHTML = '';
+          for (const n of data.notifications) {
+            if (n.status === 'read') continue;
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <strong>[${n.type}]</strong> ${n.summary} <em>(${new Date(n.created_at).toLocaleString()})</em>
+              <button onclick="markNotificationRead('${n.id}')">Dismiss</button>
+            `;
+            list.appendChild(li);
+          }
+          if (list.children.length === 0) {
+             document.getElementById('notifications-panel').style.display = 'none';
+          }
+        } else {
+          document.getElementById('notifications-panel').style.display = 'none';
+        }
+      } catch (err) {
+        console.error('Failed to fetch notifications', err);
+      }
+    }
+
+    async function markNotificationRead(id) {
+      try {
+        await fetch(`/api/notifications/${id}/read`, {
+          method: 'POST',
+          headers: { 'x-csrf-token': csrfToken }
+        });
+        fetchNotifications();
+      } catch (err) {
+        console.error('Failed to mark notification read', err);
+      }
+    }
+
+    setInterval(fetchNotifications, 5000);
+
+    async function fetchPendingEffects() {
+      const res = await fetch(`/effects/pending?sessionId=${sessionId}`);
+      const data = await res.json();
+      if (data.effects) {
+        for (const effect of data.effects) {
+          const div = document.createElement('div');
+          div.className = 'message agent';
+          div.innerHTML = `<span class="agent">Agent:</span> `;
+          chat.appendChild(div);
+          renderEffectProposal(effect, div);
+        }
+      }
+    }
+    fetchPendingEffects();
+
+    async function loginGitHub() {
+      const res = await fetch("/api/auth/sign-in/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "github", callbackURL: "/" })
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    }
+
+    async function logout() {
+      await fetch('/api/auth/sign-out', { method: 'POST' });
+      window.location.reload();
+    }
+
+    async function logoutAll() {
+      await fetch('/api/auth/revoke-other-sessions', { method: 'POST' });
+      await logout();
+    }
+
+    async function interruptSession() {
+      await fetch('/chat/interrupt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+        body: JSON.stringify({ sessionId })
+      });
+    }
+
+    async function resumeSession() {
+      await fetch('/chat/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+        body: JSON.stringify({ sessionId })
+      });
+    }
+
+    async function clearSession() {
+      await fetch('/chat/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+        body: JSON.stringify({ sessionId })
+      });
+    }
+
+    function appendMessage(sender, text, className) {
+      const div = document.createElement('div');
+      div.className = `message ${className}`;
+      div.innerHTML = `<span class="${className}">${sender}:</span> <span class="content">${text}</span>`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div.querySelector('.content');
+    }
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    let selectedFiles = [];
+
+    fileInput.addEventListener('change', () => {
+      selectedFiles = Array.from(fileInput.files);
+      filePreview.innerText = selectedFiles.map(f => f.name).join(', ');
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = input.value;
+      if (!message && selectedFiles.length === 0) return;
+      input.value = '';
+      
+      const filesToUpload = selectedFiles;
+      selectedFiles = [];
+      filePreview.innerText = '';
+      fileInput.value = '';
+
+      let attachmentDisplay = filesToUpload.length > 0 ? `<br><em>Attachments: ${filesToUpload.map(f => f.name).join(', ')}</em>` : '';
+      appendMessage('You', message + attachmentDisplay, 'user');
+      
+      const idempotencyKey = crypto.randomUUID();
+
+      try {
+        let attachmentIds = [];
+        for (const file of filesToUpload) {
+          if (file.size > 20 * 1024 * 1024) {
+             appendMessage('System', `File ${file.name} is too large (max 20MB)`, 'system');
+             return;
+          }
+          const uploadRes = await fetch('/api/artifacts?sessionId=' + sessionId, {
+            method: 'POST',
+            headers: {
+              'x-csrf-token': csrfToken,
+              'x-file-name': file.name,
+              'x-file-type': file.type || 'application/octet-stream',
+              'Content-Type': 'application/octet-stream'
+            },
+            body: file
+          });
+          if (!uploadRes.ok) {
+             const errData = await uploadRes.json();
+             throw new Error(errData.error || "Upload failed");
+          }
+          const { id } = await uploadRes.json();
+          attachmentIds.push(id);
+        }
+
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-csrf-token': csrfToken
+          },
+          body: JSON.stringify({ message: message || "Uploaded file", sessionId, idempotencyKey, attachmentIds })
+        });
+        
+        if (response.status !== 202) {
+          throw new Error("Failed to queue message");
+        }
+
+        // We could poll or connect to SSE here. Let's setup SSE if not setup.
+      } catch (err) {
+        console.error('Error fetching stream', err);
+      }
+    });
+
+    async function handleEffectAction(id, action, body, btn) {
+      btn.disabled = true;
+      const res = await fetch(`/effects/${id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const data = await res.json();
+      
+      const resultDiv = document.createElement('div');
+      resultDiv.innerHTML = `<strong>Result:</strong> ${data.success ? action.charAt(0).toUpperCase() + action.slice(1) + 'd' : 'Failed: ' + data.error}`;
+      btn.parentElement.appendChild(resultDiv);
+    }
+
+    async function approveEffect(id, digest, btn) {
+      await handleEffectAction(id, 'approve', { digest }, btn);
+    }
+
+    async function rejectEffect(id, btn) {
+      await handleEffectAction(id, 'reject', null, btn);
+    }
+
+    function renderEffectProposal(effect, container) {
+      const div = document.createElement('div');
+      div.style.border = "1px solid orange";
+      div.style.padding = "0.5rem";
+      div.style.marginTop = "0.5rem";
+      
+      let payloadObj = {};
+      try { payloadObj = JSON.parse(effect.payload); } catch(e) { payloadObj = effect.payload; }
+      
+      let detailsHTML = `<pre style="background:#f0f0f0;padding:4px">${JSON.stringify(payloadObj, null, 2)}</pre>`;
+      if (payloadObj.action === 'send_email') {
+        detailsHTML = `
+          <div style="background:#eef; padding:8px; margin: 8px 0;">
+            <div><strong>To:</strong> ${payloadObj.to}</div>
+            <div><strong>Subject:</strong> ${payloadObj.subject}</div>
+            <hr/>
+            <div style="white-space: pre-wrap;">${payloadObj.body}</div>
+          </div>
+        `;
+      }
+
+      div.innerHTML = `
+        <strong>Effect Proposed:</strong> ${effect.summary}<br/>
+        ${detailsHTML}
+        <button onclick="approveEffect('${effect.id}', '${effect.digest}', this)">Approve</button>
+        <button onclick="rejectEffect('${effect.id}', this)">Reject</button>
+      `;
+      container.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    let sse = null;
+    function connectSSE() {
+      if (sse) return;
+      sse = new EventSource(`/chat/events?sessionId=${sessionId}`);
+      
+      let agentContentSpan = appendMessage('Agent', '', 'agent');
+      let currentStatusSpan = null;
+
+      const handlers = {
+        lifecycle: (data) => {
+          if (!currentStatusSpan) {
+            currentStatusSpan = document.createElement('div');
+            currentStatusSpan.className = 'lifecycle';
+            agentContentSpan.parentNode.appendChild(currentStatusSpan);
+          }
+          currentStatusSpan.innerText = `Lifecycle: ${data.event}`;
+        },
+        text: (data) => {
+          agentContentSpan.innerText += data.text;
+          chat.scrollTop = chat.scrollHeight;
+        },
+        propose_effect: (data) => {
+          if (currentStatusSpan) currentStatusSpan.innerText = 'Proposed effect.';
+          renderEffectProposal(data.effect, agentContentSpan.parentNode);
+          agentContentSpan = appendMessage('Agent', '', 'agent');
+          currentStatusSpan = null;
+        },
+        done: (data) => {
+          if (currentStatusSpan) currentStatusSpan.innerText = 'Completed.';
+          agentContentSpan = appendMessage('Agent', '', 'agent');
+          currentStatusSpan = null;
+        },
+        error: (data) => {
+          agentContentSpan.innerText += ` [Error: ${data.error}]`;
+        },
+        interrupted: (data) => {
+          if (currentStatusSpan) currentStatusSpan.innerText = 'Interrupted.';
+          agentContentSpan = appendMessage('Agent', '', 'agent');
+          currentStatusSpan = null;
+        }
+      };
+
+      sse.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        if (handlers[payload.type]) {
+          handlers[payload.type](payload.data || payload);
+        }
+      };
+    }
+    
+    async function checkEmails() {
+      try {
+        const res = await fetch('/api/emails/check', { method: 'POST', headers: { 'x-csrf-token': csrfToken } });
+        if (!res.ok) throw new Error('Check emails failed');
+        alert('Mail checked successfully!');
+        loadEmails();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to check emails');
+      }
+    }
+
+    async function loadEmails() {
+      const panel = document.getElementById('emails-panel');
+      const list = document.getElementById('emails-list');
+      panel.style.display = 'block';
+      list.innerHTML = '<li>Loading...</li>';
+      try {
+        const res = await fetch('/api/emails');
+        if (!res.ok) throw new Error('Failed to load emails');
+        const data = await res.json();
+        const emails = data.emails || [];
+        list.innerHTML = '';
+        if (emails.length === 0) {
+          list.innerHTML = '<li>No emails</li>';
+        } else {
+          for (const em of emails) {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${em.sender}</strong> - ${em.subject} 
+              <br/><small>${new Date(em.received_at).toLocaleString()}</small>
+              <br/><button onclick="openEmail('${em.id}')">Open</button>`;
+            list.appendChild(li);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        list.innerHTML = '<li>Error loading emails</li>';
+      }
+    }
+
+    async function openEmail(id) {
+      try {
+        await fetch(`/api/emails/${id}/open`, { method: 'POST', headers: { 'x-csrf-token': csrfToken } });
+        alert('Email marked as open');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
+    // Connect SSE early
+    connectSSE();
+  </script>
+</body>
+</html>

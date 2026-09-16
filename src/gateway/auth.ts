@@ -7,7 +7,7 @@ export const db = new Database("gateway.db");
 export const auth = betterAuth({
   database: db,
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-  trustedOrigins: ["http://127.0.0.1:3000", "http://localhost:3000"],
+  trustedOrigins: ["http://127.0.0.1:3000", "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"],
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || "unset",

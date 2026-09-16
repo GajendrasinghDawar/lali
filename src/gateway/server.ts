@@ -32,12 +32,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'"],
-    }
-  }
+    },
+  },
 }));
 app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser(process.env.COOKIE_SECRET || "lali-secret"));
@@ -197,7 +197,7 @@ app.delete("/api/sessions/:id", doubleCsrfProtection, apiLimiter, async (req, re
   }
 });
 
-app.use(express.static(path.join(import.meta.dirname, "../web")));
+app.use(express.static(path.join(import.meta.dirname, "../../dist/web")));
 
 import { ArtifactManager } from "./artifacts.ts";
 
@@ -314,7 +314,7 @@ app.get("/api/emails", apiLimiter, (req, res) => {
   }
 });
 
-app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
+app.post("/api/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { message, sessionId, idempotencyKey, attachmentIds } = req.body;
   if (!message || !sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "Message and sessionId required" });
 
@@ -326,7 +326,7 @@ app.post("/chat", doubleCsrfProtection, apiLimiter, (req, res) => {
   }
 });
 
-app.post("/chat/interrupt", doubleCsrfProtection, apiLimiter, (req, res) => {
+app.post("/api/chat/interrupt", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
   
@@ -339,7 +339,7 @@ app.post("/chat/interrupt", doubleCsrfProtection, apiLimiter, (req, res) => {
   }
 });
 
-app.post("/chat/resume", doubleCsrfProtection, apiLimiter, (req, res) => {
+app.post("/api/chat/resume", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
   
@@ -352,7 +352,7 @@ app.post("/chat/resume", doubleCsrfProtection, apiLimiter, (req, res) => {
   }
 });
 
-app.post("/chat/clear", doubleCsrfProtection, apiLimiter, (req, res) => {
+app.post("/api/chat/clear", doubleCsrfProtection, apiLimiter, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
   
@@ -365,7 +365,7 @@ app.post("/chat/clear", doubleCsrfProtection, apiLimiter, (req, res) => {
   }
 });
 
-app.get("/effects/pending", apiLimiter, (req, res) => {
+app.get("/api/effects/pending", apiLimiter, (req, res) => {
   const sessionId = req.query.sessionId as string;
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST" });
   
@@ -379,7 +379,7 @@ app.get("/effects/pending", apiLimiter, (req, res) => {
   res.json({ effects: pending });
 });
 
-app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, res) => {
+app.post("/api/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, res) => {
   const id = req.params.id as string;
   const digest = req.body.digest as string;
   try {
@@ -403,7 +403,7 @@ app.post("/effects/:id/approve", doubleCsrfProtection, apiLimiter, async (req, r
   }
 });
 
-app.post("/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => {
+app.post("/api/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => {
   const id = req.params.id as string;
   try {
     const effect = db.prepare("SELECT sessionId FROM effects WHERE id = ?").get(id) as { sessionId: string } | undefined;
@@ -424,9 +424,9 @@ app.post("/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => 
   }
 });
 
-app.get("/chat/events", apiLimiter, (req, res) => {
+app.get("/api/chat/events", apiLimiter, (req, res) => {
   const sessionId = req.query.sessionId as string;
-  const lastEventId = req.headers["last-event-id"];
+  const lastEventId = req.headers["last-event-id"] as string | undefined;
   const queryAfter = req.query.after as string;
   const after = parseInt(lastEventId || queryAfter || "0", 10);
   
@@ -482,7 +482,7 @@ app.get("/chat/events", apiLimiter, (req, res) => {
 });
 
 app.use((req, res) => {
-  res.sendFile(path.join(import.meta.dirname, "../web/index.html"));
+  res.sendFile(path.join(import.meta.dirname, "../../dist/web/index.html"));
 });
 
 export { app, db };
