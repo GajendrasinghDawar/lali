@@ -473,7 +473,7 @@ if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).hr
     startRetentionCron();
     const PORT = parseInt(process.env.PORT || "3000", 10);
   app.listen(PORT, "127.0.0.1", () => {
-    console.log(`Gateway listening on 127.0.0.1:${PORT}`);
+    console.log(`Gateway listening on http://localhost:${PORT}`);
     initTelegram();
     ScheduledJobsManager.start();
   });

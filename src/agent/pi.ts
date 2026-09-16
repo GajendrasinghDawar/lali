@@ -2,12 +2,23 @@ import { EventEmitter } from "events";
 import { type Context } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
+import * as fs from 'fs';
+
 try { process.loadEnvFile(); } catch (_e) {}
 
-const AZURE_BASE_URL = (process.env.AZURE_OPENAI_BASE_URL || "https://princ-msg6fgey-southeastasia.services.ai.azure.com").trim();
-const AZURE_API_KEY = (process.env.AZURE_OPENAI_API_KEY || "").trim();
-const AZURE_API_VERSION = (process.env.AZURE_OPENAI_API_VERSION || "2025-04-01-preview").trim();
-const AZURE_DEPLOYMENT = (process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini").trim().replace(/^"|"$/g, '');
+let envStr = "";
+try { envStr = fs.readFileSync('.env', 'utf8'); } catch (e) {}
+
+function getEnv(key: string, defaultVal: string): string {
+  const match = envStr.match(new RegExp(`^${key}="?([^"\\n]+)"?`, 'm'));
+  if (match) return match[1].trim();
+  return (process.env[key] || defaultVal).trim();
+}
+
+const AZURE_BASE_URL = getEnv("AZURE_OPENAI_BASE_URL", "https://princ-msg6fgey-southeastasia.services.ai.azure.com");
+const AZURE_API_KEY = getEnv("AZURE_OPENAI_API_KEY", "");
+const AZURE_API_VERSION = getEnv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview");
+const AZURE_DEPLOYMENT = getEnv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini");
 
 const SYSTEM_PROMPT = `You are Lali, a helpful personal AI assistant. You are direct, concise, and helpful.
 When the user asks you to do something that requires an external action (sending email, publishing code, transferring funds), describe what you would do but do not pretend to execute it.
@@ -47,15 +58,13 @@ export class PiSession extends EventEmitter {
 
     let fullText = "";
     try {
-      // Get a base model definition for Azure OpenAI responses
-      const model = models.getModel('azure-openai-responses', 'gpt-4o') || models.getModel('azure-openai-responses', 'gpt-4o-mini');
-      if (!model) throw new Error("Azure OpenAI model not found in pi-ai catalog");
+      const baseModel = models.getModel('openai', 'gpt-4o') || models.getModel('openai', 'gpt-4o-mini');
+      if (!baseModel) throw new Error("OpenAI model not found in pi-ai catalog");
+      
+      const model = { ...baseModel, id: AZURE_DEPLOYMENT, baseUrl: AZURE_BASE_URL };
 
       const stream = models.stream(model, this.context, {
         apiKey: AZURE_API_KEY,
-        azureBaseUrl: AZURE_BASE_URL,
-        azureDeploymentName: AZURE_DEPLOYMENT,
-        azureApiVersion: AZURE_API_VERSION
       });
 
       for await (const event of stream) {

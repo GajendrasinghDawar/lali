@@ -13,7 +13,7 @@ export function startupCleanup() {
     // 3. Mark sessions with interrupted requests as paused
     const interruptedRequests = db.prepare("SELECT DISTINCT sessionId FROM requests WHERE status = 'interrupted'").all() as { sessionId: string }[];
     for (const req of interruptedRequests) {
-      db.prepare("INSERT INTO session_state (sessionId, is_paused) VALUES (?, 1) ON CONFLICT(sessionId) DO UPDATE SET is_paused = 1").run(req.sessionId);
+      db.prepare("UPDATE session_state SET is_paused = 1 WHERE sessionId = ?").run(req.sessionId);
     }
     db.exec("COMMIT");
   } catch (e) {

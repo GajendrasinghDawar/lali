@@ -79,7 +79,7 @@ function getAgentSocket(): Promise<net.Socket> {
 
     socket.on("data", (data) => {
       buffer += data.toString();
-      const parts = buffer.split("\\n");
+      const parts = buffer.split("\n");
       buffer = parts.pop() || "";
 
       for (const msg of parts) {
@@ -188,7 +188,7 @@ export class QueueManager {
 
   static interruptSession(sessionId: string) {
     db.prepare("UPDATE requests SET status = 'interrupted' WHERE sessionId = ? AND status = 'running'").run(sessionId);
-    db.prepare("INSERT INTO session_state (sessionId, is_paused) VALUES (?, 1) ON CONFLICT(sessionId) DO UPDATE SET is_paused = 1").run(sessionId);
+    db.prepare("UPDATE session_state SET is_paused = 1 WHERE sessionId = ?").run(sessionId);
     db.prepare("UPDATE requests SET status = 'paused_for_confirmation' WHERE sessionId = ? AND status = 'queued'").run(sessionId);
     
     // Broadcast interrupt

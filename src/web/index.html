@@ -366,6 +366,55 @@
       };
     }
     
+    async function checkEmails() {
+      try {
+        const res = await fetch('/api/emails/check', { method: 'POST', headers: { 'x-csrf-token': csrfToken } });
+        if (!res.ok) throw new Error('Check emails failed');
+        alert('Mail checked successfully!');
+        loadEmails();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to check emails');
+      }
+    }
+
+    async function loadEmails() {
+      const panel = document.getElementById('emails-panel');
+      const list = document.getElementById('emails-list');
+      panel.style.display = 'block';
+      list.innerHTML = '<li>Loading...</li>';
+      try {
+        const res = await fetch('/api/emails');
+        if (!res.ok) throw new Error('Failed to load emails');
+        const data = await res.json();
+        const emails = data.emails || [];
+        list.innerHTML = '';
+        if (emails.length === 0) {
+          list.innerHTML = '<li>No emails</li>';
+        } else {
+          for (const em of emails) {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${em.sender}</strong> - ${em.subject} 
+              <br/><small>${new Date(em.received_at).toLocaleString()}</small>
+              <br/><button onclick="openEmail('${em.id}')">Open</button>`;
+            list.appendChild(li);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        list.innerHTML = '<li>Error loading emails</li>';
+      }
+    }
+
+    async function openEmail(id) {
+      try {
+        await fetch(`/api/emails/${id}/open`, { method: 'POST', headers: { 'x-csrf-token': csrfToken } });
+        alert('Email marked as open');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
     // Connect SSE early
     connectSSE();
   </script>
