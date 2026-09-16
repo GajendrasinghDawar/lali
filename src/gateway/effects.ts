@@ -1,6 +1,9 @@
 import { db } from "./auth.ts";
 import crypto from "crypto";
 import { GitHubManager } from "./github.ts";
+import { EventEmitter } from "events";
+
+export const effectEvents = new EventEmitter();
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS effects (
@@ -61,7 +64,7 @@ export class EffectManager {
   }
 
   static reject(id: string) {
-    const effect = db.prepare("SELECT sessionId, status FROM effects WHERE id = ?").get(id) as { sessionId: string; status: string } | undefined;
+    const effect = db.prepare("SELECT sessionId, requestId, status FROM effects WHERE id = ?").get(id) as { sessionId: string; requestId: string; status: string } | undefined;
     if (!effect) throw new Error("Effect not found");
     if (effect.status !== "pending") throw new Error("Effect is not pending");
 
@@ -69,6 +72,7 @@ export class EffectManager {
     if (result.changes === 0) {
       throw new Error("Failed to reject effect");
     }
+    effectEvents.emit("status_changed", { sessionId: effect.sessionId, requestId: effect.requestId, id, status: "rejected" });
     return effect.sessionId;
   }
 
@@ -77,7 +81,7 @@ export class EffectManager {
     const result = db.prepare("UPDATE effects SET status = 'approved' WHERE id = ? AND digest = ? AND status = 'pending' AND expires_at > datetime('now')").run(id, digest);
     
     if (result.changes === 0) {
-      const effect = db.prepare("SELECT status, digest, expires_at FROM effects WHERE id = ?").get(id) as any;
+      const effect = db.prepare("SELECT sessionId, requestId, status, digest, expires_at FROM effects WHERE id = ?").get(id) as any;
       if (!effect) throw new Error("Effect not found");
       if (effect.status !== "pending") throw new Error("Effect is not pending");
       if (effect.digest !== digest) throw new Error("Digest mismatch");
@@ -85,14 +89,18 @@ export class EffectManager {
       const isExpired = db.prepare("SELECT 1 FROM effects WHERE id = ? AND expires_at <= datetime('now')").get(id);
       if (isExpired) {
         db.prepare("UPDATE effects SET status = 'expired' WHERE id = ?").run(id);
+        effectEvents.emit("status_changed", { sessionId: effect.sessionId, requestId: effect.requestId, id, status: "expired" });
         throw new Error("Effect expired");
       }
       throw new Error("Failed to approve effect");
+    } else {
+      const effect = db.prepare("SELECT sessionId, requestId FROM effects WHERE id = ?").get(id) as any;
+      effectEvents.emit("status_changed", { sessionId: effect.sessionId, requestId: effect.requestId, id, status: "approved" });
     }
   }
 
   static async execute(id: string) {
-    const effect = db.prepare("SELECT payload, digest, sessionId FROM effects WHERE id = ?").get(id) as { payload: string; digest: string; sessionId: string } | undefined;
+    const effect = db.prepare("SELECT payload, digest, sessionId, requestId FROM effects WHERE id = ?").get(id) as { payload: string; digest: string; sessionId: string; requestId: string } | undefined;
     if (!effect) throw new Error("Effect not found");
 
     const hash = crypto.createHash('sha256');
@@ -100,6 +108,7 @@ export class EffectManager {
     const currentDigest = hash.digest('hex');
     if (currentDigest !== effect.digest) {
       db.prepare("UPDATE effects SET status = 'failed' WHERE id = ?").run(id);
+      effectEvents.emit("status_changed", { sessionId: effect.sessionId, requestId: effect.requestId, id, status: "failed" });
       throw new Error("Payload tampered in database");
     }
 
@@ -108,8 +117,8 @@ export class EffectManager {
     if (result.changes === 0) {
       throw new Error("Effect not approved or already executed");
     }
+    effectEvents.emit("status_changed", { sessionId: effect.sessionId, requestId: effect.requestId, id, status: "running" });
 
-    
     const payload = JSON.parse(effect.payload);
 
     let execResult;
@@ -153,8 +162,10 @@ export class EffectManager {
       }
 
       db.prepare("UPDATE effects SET status = 'executed' WHERE id = ?").run(id);
+      effectEvents.emit("status_changed", { sessionId: effect.sessionId, requestId: effect.requestId, id, status: "executed" });
     } catch (e) {
       db.prepare("UPDATE effects SET status = 'unknown' WHERE id = ?").run(id);
+      effectEvents.emit("status_changed", { sessionId: effect.sessionId, requestId: effect.requestId, id, status: "unknown" });
       throw new Error(`Execution error (status unknown): ${e instanceof Error ? e.message : String(e)}`);
     }
 

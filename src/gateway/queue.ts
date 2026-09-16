@@ -4,7 +4,7 @@ import * as net from "net";
 import * as os from "os";
 import { AgentEventSchema, PROTOCOL_VERSION } from "../shared/protocol.ts";
 import type { AgentEvent } from "../shared/protocol.ts";
-import { EffectManager } from "./effects.ts";
+import { EffectManager, effectEvents } from "./effects.ts";
 import { EventEmitter } from "events";
 
 export const queueEvents = new EventEmitter();
@@ -61,7 +61,7 @@ db.exec(`UPDATE requests SET status = 'interrupted' WHERE status = 'running'`);
 const SOCKET_PATH = os.platform() === "win32" ? "\\\\.\\pipe\\lali-agent" : "/tmp/lali-agent.sock";
 let agentSocket: net.Socket | null = null;
 const responseEmitters = new Map<string, (event: AgentEvent) => void>();
-export const sseEmitters = new Map<string, (event: AgentEvent | { type: string, sequence: number, requestId: string, data: unknown }) => void>();
+export const sseEmitters = new Map<string, Set<(event: AgentEvent | { type: string, sequence: number, requestId: string, data: unknown }) => void>>();
 
 function getAgentSocket(): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
@@ -158,6 +158,8 @@ export class QueueManager {
       id, sessionId, idempotencyKey || null, message, status, replyChannel
     );
 
+    QueueManager.appendEvent(sessionId, id, "user_message", { message, attachmentIds });
+
     const request = db.prepare("SELECT * FROM requests WHERE id = ?").get(id) as { id: string, status: string };
     
     setTimeout(() => QueueManager.processQueue(sessionId), 0);
@@ -176,8 +178,12 @@ export class QueueManager {
     );
     const eventObj = { type, data, sequence: seq, requestId };
     
-    const clientEmitter = sseEmitters.get(sessionId);
-    if (clientEmitter) clientEmitter(eventObj);
+    const clientEmitters = sseEmitters.get(sessionId);
+    if (clientEmitters) {
+      for (const emitter of clientEmitters) {
+        emitter(eventObj);
+      }
+    }
     return eventObj;
   }
 
@@ -309,3 +315,7 @@ export class QueueManager {
     }
   }
 }
+
+effectEvents.on("status_changed", ({ sessionId, requestId, id, status }) => {
+  QueueManager.appendEvent(sessionId, requestId, "effect_status", { id, status });
+});

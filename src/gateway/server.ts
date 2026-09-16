@@ -426,32 +426,58 @@ app.post("/effects/:id/reject", doubleCsrfProtection, apiLimiter, (req, res) => 
 
 app.get("/chat/events", apiLimiter, (req, res) => {
   const sessionId = req.query.sessionId as string;
-  const after = parseInt(req.query.after as string || "0", 10);
+  const lastEventId = req.headers["last-event-id"];
+  const queryAfter = req.query.after as string;
+  const after = parseInt(lastEventId || queryAfter || "0", 10);
+  
   if (!sessionId) return res.status(400).json({ error: "ERR_BAD_REQUEST", message: "sessionId required" });
 
   try {
     QueueManager.assertSessionOwner(sessionId, res.locals.userId);
-  } catch (err) { const message = err instanceof Error ? err.message : String(err);
+  } catch (err) { 
+    const message = err instanceof Error ? err.message : String(err);
     return res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
   }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  const writeEvent = (ev: { sequence: number }) => {
+    res.write(`id: ${ev.sequence}\n`);
+    res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  };
 
   // Send missed events
   const pastEvents = QueueManager.getEventsAfter(sessionId, after);
   for (const ev of pastEvents) {
-    res.write(`data: ${JSON.stringify(ev)}\n\n`);
+    writeEvent(ev);
   }
 
   // Subscribe to new events
-  sseEmitters.set(sessionId, (event) => {
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
-  });
+  let emitters = sseEmitters.get(sessionId);
+  if (!emitters) {
+    emitters = new Set();
+    sseEmitters.set(sessionId, emitters);
+  }
+  
+  const listener = (event: any) => {
+    writeEvent(event);
+  };
+  emitters.add(listener);
+
+  // Heartbeat to keep connection alive
+  const heartbeat = setInterval(() => {
+    res.write(": heartbeat\n\n");
+  }, 15000);
 
   req.on("close", () => {
-    sseEmitters.delete(sessionId);
+    clearInterval(heartbeat);
+    emitters?.delete(listener);
+    if (emitters?.size === 0) {
+      sseEmitters.delete(sessionId);
+    }
   });
 });
 
