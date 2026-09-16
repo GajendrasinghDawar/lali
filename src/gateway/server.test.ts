@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
-import { app, db } from "./server.ts";
+import { app } from './server.ts';
+import { db } from "./auth.ts";
 import { QueueManager } from "./queue.ts";
 import { EffectManager } from "./effects.ts";
 
@@ -42,7 +43,7 @@ describe("Gateway API", () => {
     
     // First request
     const res1 = await request(app)
-      .post("/chat")
+      .post("/api/chat")
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send(payload);
@@ -51,7 +52,7 @@ describe("Gateway API", () => {
 
     // Second request with same key
     const res2 = await request(app)
-      .post("/chat")
+      .post("/api/chat")
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send(payload);
@@ -64,7 +65,7 @@ describe("Gateway API", () => {
     const payload2 = { sessionId: "sess1", message: "hello 2" };
 
     const res1 = await request(app)
-      .post("/chat")
+      .post("/api/chat")
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send(payload1);
@@ -74,7 +75,7 @@ describe("Gateway API", () => {
     db.prepare("UPDATE requests SET status = 'running' WHERE id = ?").run(res1.body.requestId);
 
     const res2 = await request(app)
-      .post("/chat")
+      .post("/api/chat")
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send(payload2);
@@ -83,7 +84,7 @@ describe("Gateway API", () => {
 
     // Interrupt
     await request(app)
-      .post("/chat/interrupt")
+      .post("/api/chat/interrupt")
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send({ sessionId: "sess1" });
@@ -93,7 +94,7 @@ describe("Gateway API", () => {
 
     // Resume
     await request(app)
-      .post("/chat/resume")
+      .post("/api/chat/resume")
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send({ sessionId: "sess1" });
@@ -107,14 +108,14 @@ describe("Gateway API", () => {
     
     // Check pending
     const res = await request(app)
-      .get("/effects/pending?sessionId=sess1")
+      .get("/api/effects/pending?sessionId=sess1")
       .set("Cookie", cookie);
     expect(res.body.effects).toHaveLength(1);
     expect(res.body.effects[0].id).toBe(effect.id);
 
     // Approve
     const approveRes = await request(app)
-      .post(`/effects/${effect.id}/approve`)
+      .post(`/api/effects/${effect.id}/approve`)
       .set("Cookie", cookie)
       .set("x-csrf-token", csrfToken)
       .send({ digest: effect.digest });
