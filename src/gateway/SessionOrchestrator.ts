@@ -1,23 +1,33 @@
 import crypto from "crypto";
 import { EventEmitter } from "events";
-import { AgentTransport } from "./AgentTransport.ts";
-import { SessionStore } from "./SessionStore.ts";
+import type { AgentTransport } from "./AgentTransport.ts";
+import type { SessionStore } from "./SessionStore.ts";
 import { PROTOCOL_VERSION } from "../shared/protocol.ts";
 import { EffectManager } from "./effects.ts";
 
 export class SessionOrchestrator {
+  private readonly store: SessionStore;
+  private readonly agentTransport: AgentTransport;
+  private readonly queueEvents: EventEmitter;
+  private readonly sseEmitters: Map<string, Set<(event: unknown) => void>>;
+
   constructor(
-    private readonly store: SessionStore,
-    private readonly agentTransport: AgentTransport,
-    private readonly queueEvents: EventEmitter,
-    private readonly sseEmitters: Map<string, Set<(event: any) => void>>
+    store: SessionStore,
+    agentTransport: AgentTransport,
+    queueEvents: EventEmitter,
+    sseEmitters: Map<string, Set<(event: unknown) => void>>
   ) {
-    this.agentTransport.onGlobalError((err) => {
+    this.store = store;
+    this.agentTransport = agentTransport;
+    this.queueEvents = queueEvents;
+    this.sseEmitters = sseEmitters;
+
+    this.agentTransport.onGlobalError(() => {
       this.store.markAllRunningAsInterrupted();
     });
   }
 
-  private broadcastSse(sessionId: string, eventObj: any) {
+  private broadcastSse(sessionId: string, eventObj: unknown) {
     const emitters = this.sseEmitters.get(sessionId);
     if (emitters) {
       for (const emitter of emitters) {
@@ -101,7 +111,7 @@ export class SessionOrchestrator {
 
         if (event.type === "done" || event.type === "error") {
           const finalState = event.type === "done" ? "completed" : "failed";
-          const msg = event.type === "done" ? (event as any).finalResponse : (event as any).error;
+          const msg = event.type === "done" ? event.finalResponse : event.error;
           this.store.updateRequestStatus(next.id, finalState, msg);
           this.agentTransport.offEvent(next.id);
           
@@ -122,16 +132,16 @@ export class SessionOrchestrator {
         } else if (event.type === "propose_effect") {
           this.store.updateRequestStatus(next.id, "completed");
           this.agentTransport.offEvent(next.id);
-          const ev = event as any;
-          const effect = EffectManager.propose(sessionId, next.id, ev.summary, ev.payload);
+          const effect = EffectManager.propose(sessionId, next.id, event.summary, event.payload);
           
           const eventObj = this.store.appendEvent(sessionId, next.id, "propose_effect", { effect });
           this.broadcastSse(sessionId, eventObj);
           
-          this.queueEvents.emit("effect_proposed", { sessionId, requestId: next.id, effect, summary: ev.summary });
+          this.queueEvents.emit("effect_proposed", { sessionId, requestId: next.id, effect, summary: event.summary });
           setTimeout(() => this.processQueue(sessionId), 0);
         } else if (event.type === "text" || event.type === "lifecycle") {
-          const eventObj = this.store.appendEvent(sessionId, next.id, event.type, event.type === "text" ? { text: (event as any).text } : { event: (event as any).event });
+          const data = event.type === "text" ? { text: event.text } : { event: event.event };
+          const eventObj = this.store.appendEvent(sessionId, next.id, event.type, data);
           this.broadcastSse(sessionId, eventObj);
         }
       });

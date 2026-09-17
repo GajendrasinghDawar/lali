@@ -7,8 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "start:agent": "node --permission --allow-fs-read=* --allow-fs-write=* --experimental-strip-types src/agent/server.ts",
-    "start:gateway": "node --permission --allow-fs-read=* --allow-fs-write=* --experimental-strip-types src/gateway/server.ts",
+    "start:agent": "node --permission --allow-fs-read=* --allow-fs-write=* --allow-net --experimental-strip-types src/agent/server.ts",
+    "start:gateway": "node --permission --allow-fs-read=* --allow-fs-write=* --allow-net --experimental-strip-types src/gateway/server.ts",
     "dev:agent": "node --watch --experimental-strip-types src/agent/server.ts",
     "dev:gateway": "node --watch --experimental-strip-types src/gateway/server.ts",
     "dev:web": "vite dev src/web --config src/web/vite.config.ts",

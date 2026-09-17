@@ -5,7 +5,7 @@ import { SessionOrchestrator } from "./SessionOrchestrator.ts";
 import { effectEvents } from "./effects.ts";
 
 export const queueEvents = new EventEmitter();
-export const sseEmitters = new Map<string, Set<(event: any) => void>>();
+export const sseEmitters = new Map<string, Set<(event: unknown) => void>>();
 
 export const store = new SqliteSessionStore();
 export const transport = new TcpAgentTransport();

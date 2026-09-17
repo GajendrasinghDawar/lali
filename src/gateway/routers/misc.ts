@@ -26,7 +26,7 @@ MiscRouter.post("/artifacts", express.raw({ limit: '20mb', type: 'application/oc
 MiscRouter.post("/jobs", (req, res) => {
   try {
     QueueManager.assertSessionOwner("main", res.locals.userId);
-    const id = ScheduledJobsManager.create(req.body.summary, req.body.intervalMs);
+    const id = ScheduledJobsManager.createJob(req.body.summary, req.body.intervalMs);
     res.json({ id });
   } catch (err) { const message = err instanceof Error ? err.message : String(err);
     res.status(403).json({ error: "ERR_UNAUTHORIZED", message });
