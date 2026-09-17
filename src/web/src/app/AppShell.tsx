@@ -1,19 +1,17 @@
 
 import { Outlet } from "@tanstack/react-router";
 import { SessionSidebar } from "../features/sessions/SessionSidebar";
-import { SidebarProvider } from "../components/ui/sidebar/SidebarProvider";
+import { SidebarInset, SidebarProvider } from "../components/ui/sidebar";
 import { ChatHeader } from "../features/chat/ChatHeader";
 
 export function AppShell() {
   return (
     <SidebarProvider>
-      <div className="flex h-svh w-screen overflow-hidden bg-slate2">
-        <SessionSidebar />
-        <div className="relative flex min-w-0 flex-1 flex-col">
+      <SessionSidebar />
+      <SidebarInset className="h-svh overflow-hidden">
           <ChatHeader />
           <main className="min-h-0 flex-1"><Outlet /></main>
-        </div>
-      </div>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

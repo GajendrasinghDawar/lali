@@ -7,7 +7,7 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  html { color-scheme: dark; }
+  html { color-scheme: dark; scroll-behavior: smooth; }
   body { margin: 0; min-width: 320px; background: var(--color-slate2); color: var(--color-slate11); font-family: "Noto Sans", Inter, ui-sans-serif, system-ui, sans-serif; text-wrap: pretty; }
   button, input, textarea { font: inherit; }
   button { cursor: pointer; }
@@ -19,6 +19,31 @@
 @keyframes fadeIn { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
 @keyframes slideIn { from { opacity: 0; transform: translateX(-100%); } to { opacity: 1; transform: translateX(0); } }
 @keyframes shimmer { to { background-position: -200% center; } }
+@keyframes grain-shift { from { background-position: 0 0; } to { background-position: 100% 100%; } }
+@keyframes twinkle { 0%, 100% { opacity: var(--op-min); transform: scale(.8); } 50% { opacity: var(--op-max); transform: scale(1.2); } }
+
+@layer components {
+  .header-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    height: 200%;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--color-slate3) 0%, transparent 50%);
+    mask-image: linear-gradient(to bottom, var(--color-slate3) 0% 50%, transparent 50% 100%);
+    backdrop-filter: blur(16px);
+  }
+}
+
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-slate2) inset !important;
+  -webkit-text-fill-color: var(--color-slate12) !important;
+}
+
+.chat-textarea-scrollbar {
+  scrollbar-color: var(--color-slate6) var(--color-slate8);
+  scrollbar-width: thin;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
