@@ -3,10 +3,8 @@ import { fetchWithCsrf } from "../../lib/api";
 export type AppNotification = {
   id: string;
   type: string;
-  title: string;
-  body: string;
-  link?: string;
-  is_read: boolean;
+  summary: string;
+  status: "unread" | "read";
   created_at: string;
 };
 

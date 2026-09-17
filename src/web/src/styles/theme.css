@@ -1,0 +1,240 @@
+@theme {
+  --font-noto-sans: 'Noto Sans', sans-serif;
+
+  /* Shadow scale (1-6) for dark theme */
+  --shadow-1:
+    inset 0 -1px 1px 0 var(--color-slateA3),
+    inset 0 0 0 1px var(--color-slateA3),
+    inset 0 3px 4px 0 var(--color-blackA5), inset 0 0 0 1px var(--color-slateA4);
+  --shadow-2:
+    0 0 0 1px var(--color-slateA6), 0 0 0 0.5px var(--color-blackA3),
+    0 1px 1px 0 var(--color-blackA6), 0 2px 1px -1px var(--color-blackA6),
+    0 1px 3px 0 var(--color-blackA5);
+  --shadow-3:
+    0 0 0 1px var(--color-slateA6), 0 2px 3px -2px var(--color-blackA3),
+    0 3px 8px -2px var(--color-blackA6), 0 4px 12px -4px var(--color-blackA7);
+  --shadow-4:
+    0 0 0 1px var(--color-slateA6), 0 8px 40px var(--color-blackA3),
+    0 12px 32px -16px var(--color-blackA5);
+  --shadow-5:
+    0 0 0 1px var(--color-slateA6), 0 12px 60px var(--color-blackA5),
+    0 12px 32px -16px var(--color-blackA7);
+  --shadow-6:
+    0 0 0 1px var(--color-slateA6), 0 12px 60px var(--color-blackA4),
+    0 16px 64px var(--color-blackA6), 0 16px 36px -20px var(--color-blackA11);
+
+  --color-blackA1: hsla(0, 0%, 0%, 0.05);
+  --color-blackA2: hsla(0, 0%, 0%, 0.1);
+  --color-blackA3: hsla(0, 0%, 0%, 0.15);
+  --color-blackA4: hsla(0, 0%, 0%, 0.2);
+  --color-blackA5: hsla(0, 0%, 0%, 0.3);
+  --color-blackA6: hsla(0, 0%, 0%, 0.4);
+  --color-blackA7: hsla(0, 0%, 0%, 0.5);
+  --color-blackA8: hsla(0, 0%, 0%, 0.6);
+  --color-blackA9: hsla(0, 0%, 0%, 0.7);
+  --color-blackA10: hsla(0, 0%, 0%, 0.8);
+  --color-blackA11: hsla(0, 0%, 0%, 0.9);
+  --color-blackA12: hsla(0, 0%, 0%, 0.95);
+
+  --color-whiteA1: hsla(0, 0%, 100%, 0.05);
+  --color-whiteA2: hsla(0, 0%, 100%, 0.1);
+  --color-whiteA3: hsla(0, 0%, 100%, 0.15);
+  --color-whiteA4: hsla(0, 0%, 100%, 0.2);
+  --color-whiteA5: hsla(0, 0%, 100%, 0.3);
+  --color-whiteA6: hsla(0, 0%, 100%, 0.4);
+  --color-whiteA7: hsla(0, 0%, 100%, 0.5);
+  --color-whiteA8: hsla(0, 0%, 100%, 0.6);
+  --color-whiteA9: hsla(0, 0%, 100%, 0.7);
+  --color-whiteA10: hsla(0, 0%, 100%, 0.8);
+  --color-whiteA11: hsla(0, 0%, 100%, 0.9);
+  --color-whiteA12: hsla(0, 0%, 100%, 0.95);
+
+  --color-tomato1: hsl(0, 100%, 99%);
+  --color-tomato2: hsl(7, 100%, 98%);
+  --color-tomato3: hsl(10, 92%, 95%);
+  --color-tomato4: hsl(12, 100%, 91%);
+  --color-tomato5: hsl(11, 100%, 88%);
+  --color-tomato6: hsl(11, 95%, 84%);
+  --color-tomato7: hsl(10, 82%, 78%);
+  --color-tomato8: hsl(10, 75%, 70%);
+  --color-tomato9: hsl(10, 78%, 54%);
+  --color-tomato10: hsl(10, 73%, 51%);
+  --color-tomato11: hsl(10, 82%, 45%);
+  --color-tomato12: hsl(8, 50%, 24%);
+
+  --color-crimson1: hsl(338, 19%, 8%);
+  --color-crimson2: hsl(337, 25%, 10%);
+  --color-crimson3: hsl(333, 45%, 15%);
+  --color-crimson4: hsl(331, 62%, 19%);
+  --color-crimson5: hsl(331, 59%, 23%);
+  --color-crimson6: hsl(333, 49%, 29%);
+  --color-crimson7: hsl(335, 45%, 36%);
+  --color-crimson8: hsl(336, 45%, 48%);
+  --color-crimson9: hsl(336, 80%, 58%);
+  --color-crimson10: hsl(338, 82%, 63%);
+  --color-crimson11: hsl(345, 100%, 79%);
+  --color-crimson12: hsl(330, 91%, 91%);
+
+  --color-crimsonA1: hsla(337, 91%, 51%, 0.04);
+  --color-crimsonA2: hsla(337, 88%, 57%, 0.07);
+  --color-crimsonA3: hsla(333, 99%, 58%, 0.16);
+  --color-crimsonA4: hsla(331, 98%, 54%, 0.25);
+  --color-crimsonA5: hsla(331, 98%, 57%, 0.32);
+  --color-crimsonA6: hsla(333, 99%, 63%, 0.39);
+  --color-crimsonA7: hsla(335, 98%, 66%, 0.5);
+  --color-crimsonA8: hsla(336, 99%, 68%, 0.67);
+  --color-crimsonA9: hsla(336, 99%, 63%, 0.91);
+  --color-crimsonA10: hsla(338, 100%, 67%, 0.93);
+  --color-crimsonA11: hsl(345, 100%, 79%);
+  --color-crimsonA12: hsla(330, 100%, 92%, 0.99);
+
+  --color-slate1: hsl(240, 6%, 7%);
+  --color-slate2: hsl(220, 6%, 10%);
+  --color-slate3: hsl(225, 6%, 14%);
+  --color-slate4: hsl(210, 7%, 16%);
+  --color-slate5: hsl(214, 7%, 19%);
+  --color-slate6: hsl(213, 8%, 23%);
+  --color-slate7: hsl(213, 8%, 28%);
+  --color-slate8: hsl(212, 8%, 38%);
+  --color-slate9: hsl(219, 6%, 44%);
+  --color-slate10: hsl(222, 5%, 49%);
+  --color-slate11: hsl(216, 7%, 71%);
+  --color-slate12: hsl(220, 9%, 94%);
+
+  --color-slateA1: hsla(0, 0%, 0%, 0);
+  --color-slateA2: hsla(184, 63%, 91%, 0.04);
+  --color-slateA3: hsla(211, 66%, 92%, 0.08);
+  --color-slateA4: hsla(198, 73%, 90%, 0.11);
+  --color-slateA5: hsla(208, 95%, 92%, 0.15);
+  --color-slateA6: hsla(208, 91%, 92%, 0.19);
+  --color-slateA7: hsla(208, 100%, 93%, 0.25);
+  --color-slateA8: hsla(208, 100%, 93%, 0.36);
+  --color-slateA9: hsla(216, 88%, 93%, 0.43);
+  --color-slateA10: hsla(220, 86%, 95%, 0.48);
+  --color-slateA11: hsla(212, 87%, 97%, 0.71);
+  --color-slateA12: hsla(220, 100%, 99%, 0.94);
+
+  --color-slate-contrast: #ffffff;
+  --color-slate-surface: rgba(0, 0, 0, 0.05);
+  --color-slate-indicator: #6c6e72;
+  --color-slate-track: #6c6e72;
+
+  --color-amber1: hsl(36, 29%, 7%);
+  --color-amber2: hsl(39, 32%, 9%);
+  --color-amber3: hsl(36, 71%, 11%);
+  --color-amber4: hsl(37, 100%, 12%);
+  --color-amber5: hsl(37, 100%, 15%);
+  --color-amber6: hsl(39, 90%, 19%);
+  --color-amber7: hsl(37, 64%, 27%);
+  --color-amber8: hsl(36, 60%, 35%);
+  --color-amber9: hsl(42, 100%, 62%);
+  --color-amber10: hsl(50, 100%, 52%);
+  --color-amber11: hsl(46, 100%, 54%);
+  --color-amber12: hsl(41, 100%, 85%);
+
+  --color-amberA1: hsla(16, 100%, 45%, 0.02);
+  --color-amberA2: hsla(37, 100%, 50%, 0.05);
+  --color-amberA3: hsla(31, 100%, 49%, 0.13);
+  --color-amberA4: hsla(31, 100%, 49%, 0.2);
+  --color-amberA5: hsla(33, 100%, 50%, 0.25);
+  --color-amberA6: hsla(37, 100%, 50%, 0.32);
+  --color-amberA7: hsla(37, 100%, 57%, 0.4);
+  --color-amberA8: hsla(36, 100%, 60%, 0.53);
+  --color-amberA9: hsl(42, 100%, 62%);
+  --color-amberA10: hsl(50, 100%, 52%);
+  --color-amberA11: hsl(46, 100%, 54%);
+  --color-amberA12: hsl(41, 100%, 85%);
+
+  --color-red1: hsl(0, 19%, 8%);
+  --color-red2: hsl(355, 25%, 10%);
+  --color-red3: hsl(350, 53%, 15%);
+  --color-red4: hsl(348, 68%, 19%);
+  --color-red5: hsl(350, 63%, 23%);
+  --color-red6: hsl(352, 53%, 29%);
+  --color-red7: hsl(355, 47%, 37%);
+  --color-red8: hsl(358, 45%, 49%);
+  --color-red9: hsl(358, 75%, 59%);
+  --color-red10: hsl(360, 79%, 65%);
+  --color-red11: hsl(2, 100%, 79%);
+  --color-red12: hsl(350, 100%, 91%);
+
+  --color-redA1: hsla(0, 91%, 51%, 0.04);
+  --color-redA2: hsla(355, 88%, 57%, 0.07);
+  --color-redA3: hsla(350, 100%, 55%, 0.18);
+  --color-redA4: hsla(348, 99%, 52%, 0.27);
+  --color-redA5: hsla(350, 100%, 56%, 0.34);
+  --color-redA6: hsla(353, 100%, 62%, 0.41);
+  --color-redA7: hsla(355, 100%, 66%, 0.52);
+  --color-redA8: hsla(359, 100%, 68%, 0.69);
+  --color-redA9: hsla(358, 99%, 65%, 0.89);
+  --color-redA10: hsla(360, 100%, 70%, 0.92);
+  --color-redA11: hsl(2, 100%, 79%);
+  --color-redA12: hsl(350, 100%, 91%);
+
+  --color-grass1: hsl(146, 20%, 7%);
+  --color-grass2: hsl(130, 13%, 9%);
+  --color-grass3: hsl(132, 22%, 14%);
+  --color-grass4: hsl(134, 33%, 17%);
+  --color-grass5: hsl(134, 32%, 21%);
+  --color-grass6: hsl(133, 32%, 26%);
+  --color-grass7: hsl(132, 31%, 31%);
+  --color-grass8: hsl(131, 32%, 36%);
+  --color-grass9: hsl(131, 41%, 46%);
+  --color-grass10: hsl(131, 39%, 51%);
+  --color-grass11: hsl(131, 50%, 63%);
+  --color-grass12: hsl(120, 61%, 85%);
+
+  --color-grassA1: hsla(125, 100%, 44%, 0.02);
+  --color-grassA2: hsla(130, 91%, 67%, 0.04);
+  --color-grassA3: hsla(132, 99%, 72%, 0.11);
+  --color-grassA4: hsla(135, 100%, 67%, 0.17);
+  --color-grassA5: hsla(134, 100%, 70%, 0.23);
+  --color-grassA6: hsla(133, 100%, 72%, 0.29);
+  --color-grassA7: hsla(132, 97%, 73%, 0.36);
+  --color-grassA8: hsla(131, 97%, 73%, 0.44);
+  --color-grassA9: hsla(131, 100%, 70%, 0.63);
+  --color-grassA10: hsla(131, 100%, 72%, 0.68);
+  --color-grassA11: hsla(131, 100%, 77%, 0.8);
+  --color-grassA12: hsla(120, 100%, 90%, 0.94);
+
+  --color-jade1: hsl(158, 24%, 7%);
+  --color-jade2: hsl(156, 22%, 9%);
+  --color-jade3: hsl(157, 51%, 12%);
+  --color-jade4: hsl(161, 69%, 14%);
+  --color-jade5: hsl(161, 62%, 17%);
+  --color-jade6: hsl(162, 53%, 22%);
+  --color-jade7: hsl(162, 49%, 27%);
+  --color-jade8: hsl(164, 50%, 33%);
+  --color-jade9: hsl(164, 60%, 40%);
+  --color-jade10: hsl(164, 64%, 42%);
+  --color-jade11: hsl(163, 75%, 48%);
+  --color-jade12: hsl(155, 69%, 81%);
+
+  --color-jadeA1: hsla(139, 100%, 44%, 0.02);
+  --color-jadeA2: hsla(156, 96%, 57%, 0.05);
+  --color-jadeA3: hsla(157, 98%, 49%, 0.13);
+  --color-jadeA4: hsla(160, 100%, 50%, 0.18);
+  --color-jadeA5: hsla(162, 100%, 53%, 0.23);
+  --color-jadeA6: hsla(162, 100%, 60%, 0.29);
+  --color-jadeA7: hsla(162, 98%, 63%, 0.37);
+  --color-jadeA8: hsla(164, 100%, 64%, 0.46);
+  --color-jadeA9: hsla(164, 99%, 61%, 0.62);
+  --color-jadeA10: hsla(164, 99%, 59%, 0.67);
+  --color-jadeA11: hsla(163, 99%, 56%, 0.84);
+  --color-jadeA12: hsla(155, 100%, 86%, 0.94);
+
+  --color-violet1: hsl(249, 27%, 10%);
+  --color-violet2: hsl(263, 28%, 11%);
+  --color-violet3: hsl(257, 37%, 19%);
+  --color-violet4: hsl(256, 42%, 25%);
+  --color-violet5: hsl(254, 39%, 30%);
+  --color-violet6: hsl(255, 36%, 34%);
+  --color-violet7: hsl(254, 33%, 41%);
+  --color-violet8: hsl(252, 34%, 51%);
+  --color-violet9: hsl(252, 56%, 57%);
+  --color-violet10: hsl(252, 60%, 63%);
+  --color-violet11: hsl(253, 100%, 83%);
+  --color-violet12: hsl(249, 94%, 93%);
+
+  --animate-grain: grain-shift 20s linear infinite alternate;
+}

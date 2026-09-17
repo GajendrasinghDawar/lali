@@ -9,8 +9,18 @@ export type Message = {
   idempotencyKey?: string;
   status?: "sending" | "delivered" | "failed";
   activities?: string[];
-  effects?: any[];
+  effects?: Effect[];
   isComplete?: boolean;
+};
+
+export type Effect = {
+  id: string;
+  summary?: string;
+  type?: string;
+  payload?: unknown;
+  data?: unknown;
+  digest?: string;
+  status?: "pending" | "approved" | "rejected" | "running" | "executed" | "failed" | "expired" | "interrupted" | "unknown";
 };
 
 type ChatState = {
@@ -121,7 +131,7 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         if (existingIdx >= 0) {
           msgs[existingIdx] = { ...msgs[existingIdx], isComplete: true };
           if (event.type === "error") {
-             msgs[existingIdx].activities = [...(msgs[existingIdx].activities || []), `Error: ${(event.data as any).error}`];
+             msgs[existingIdx].activities = [...(msgs[existingIdx].activities || []), `Error: ${event.data.error}`];
           }
         }
         return { ...state, messages: msgs, isStreaming: false };
@@ -225,14 +235,22 @@ export function useChatSession(sessionId: string) {
         return;
       }
       
-      const data = await res.json();
-      if (data.request && data.request.id) {
-        dispatch({ type: "submissionAccepted", idempotencyKey, requestId: data.request.id });
+      const data: { requestId?: string } = await res.json();
+      if (data.requestId) {
+        dispatch({ type: "submissionAccepted", idempotencyKey, requestId: data.requestId });
       }
     } catch (e) {
       console.error("Failed to send message", e);
     }
   };
 
-  return { messages: state.messages, isStreaming: state.isStreaming, submitMessage };
+  const stop = async () => {
+    await fetchWithCsrf("/api/chat/interrupt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+  };
+
+  return { messages: state.messages, isStreaming: state.isStreaming, submitMessage, stop };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 export function useScrollToBottom<T extends HTMLElement>(
-  dependencies: any[],
+  dependencies: readonly unknown[],
   isStreaming: boolean
 ) {
   const containerRef = useRef<T>(null);

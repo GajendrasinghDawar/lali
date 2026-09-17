@@ -14,6 +14,8 @@
     "dev:web": "vite dev src/web --config src/web/vite.config.ts",
     "dev": "concurrently \"npm run dev:agent\" \"npm run dev:gateway\" \"npm run dev:web\"",
     "typecheck": "tsc --noEmit",
+    "typecheck:web": "tsc --project src/web/tsconfig.json",
+    "build:web": "vite build src/web --config src/web/vite.config.ts",
     "test": "vitest run --fileParallelism false"
   },
   "repository": {
@@ -30,24 +32,29 @@
   "homepage": "https://github.com/GajendrasinghDawar/lali#readme",
   "dependencies": {
     "@earendil-works/pi-ai": "^0.84.4",
+    "@fontsource/noto-sans": "^5.3.0",
     "@tanstack/react-router": "^1.170.36",
     "@types/node": "^26.4.0",
     "better-auth": "^1.7.2",
+    "clsx": "^2.1.1",
     "cookie-parser": "^1.4.7",
     "csrf-csrf": "^4.0.3",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "lucide-react": "^1.46.0",
+    "radix-ui": "^1.6.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.7.0",
     "typescript": "^7.0.2",
     "uuid": "^14.0.2",
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@tanstack/router-plugin": "^1.168.38",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
@@ -58,6 +65,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
     "supertest": "^7.2.2",
+    "tailwindcss": "^4.3.3",
     "vite": "^8.3.0",
     "vitest": "^4.1.11"
   }
