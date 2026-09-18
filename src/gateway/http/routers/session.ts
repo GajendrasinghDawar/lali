@@ -1,7 +1,7 @@
 import { Router } from "express";
 import path from "path";
-import { db } from "../auth.ts";
-import { QueueManager } from "../queue.ts";
+import { db } from "../../persistence/auth.ts";
+import { QueueManager } from "../../application/queue.ts";
 
 export const SessionRouter = Router();
 

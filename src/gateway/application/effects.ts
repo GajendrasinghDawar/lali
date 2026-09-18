@@ -1,6 +1,6 @@
-import { db } from "./auth.ts";
+import { db } from "../persistence/auth.ts";
 import crypto from "crypto";
-import { GitHubManager } from "./github.ts";
+import { GitHubManager } from "../integrations/github.ts";
 import { EventEmitter } from "events";
 
 export const effectEvents = new EventEmitter();

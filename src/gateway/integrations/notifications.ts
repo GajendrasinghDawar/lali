@@ -1,6 +1,7 @@
-import { db } from "./auth.ts";
+import { db } from "../persistence/auth.ts";
 import crypto from "crypto";
 import { EventEmitter } from "events";
+import { queueEvents } from "../application/queue.ts";
 
 export const notificationEvents = new EventEmitter();
 
@@ -23,9 +24,6 @@ export interface CreateNotificationParams {
   summary: string;
   context?: { sessionId?: string, requestId?: string, effectId?: string };
 }
-
-
-import { queueEvents } from "./queue.ts";
 
 export function initNotifications() {
   queueEvents.on("interrupted", (data) => {

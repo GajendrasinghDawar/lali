@@ -2,7 +2,7 @@
 
 ## The Problem: Shallow and Tangled `QueueManager`
 
-Currently, `QueueManager` in `src/gateway/queue.ts` is a shallow module without a clear seam. 
+Currently, `QueueManager` in `src/gateway/application/queue.ts` is a shallow module without a clear seam. 
 
 ### Why is it shallow?
 1. **Large surface area:** It exposes internal state mechanics (`getNextSequence`, `appendEvent`, `processQueue`) alongside high-level commands (`submitRequest`, `interruptSession`).

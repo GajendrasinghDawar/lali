@@ -695,6 +695,6 @@ The NanoClaw and nanobot directories are local source snapshots without Git meta
 ### Lali
 
 - [L1] `src/web/index.html` — current UI and API behavior.
-- [L2] `src/gateway/queue.ts` — requests, events, sequence assignment, SSE publication, and Agent event handling.
-- [L3] `src/gateway/server.ts` — authentication, sessions, chat, effects, SSE, email, notifications, and artifact endpoints.
+- [L2] `src/gateway/application/queue.ts` — requests, events, sequence assignment, SSE publication, and Agent event handling.
+- [L3] `src/gateway/http/server.ts` — authentication, sessions, chat, effects, SSE, email, notifications, and artifact endpoints.
 - [L4] `src/shared/protocol.ts` — current Gateway-Agent request and event protocol.

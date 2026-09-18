@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { EventEmitter } from "events";
-import type { AgentTransport } from "./AgentTransport.ts";
-import type { SessionStore } from "./SessionStore.ts";
-import { PROTOCOL_VERSION } from "../shared/protocol.ts";
+import type { AgentTransport } from "../transport/AgentTransport.ts";
+import type { SessionStore } from "../persistence/SessionStore.ts";
+import { PROTOCOL_VERSION } from "../../shared/protocol.ts";
 import { EffectManager } from "./effects.ts";
 
 export class SessionOrchestrator {

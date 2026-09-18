@@ -1,7 +1,7 @@
-import { db } from "./auth.ts";
-import { QueueManager, queueEvents } from "./queue.ts";
-import { EffectManager } from "./effects.ts";
-import { ArtifactManager } from "./artifacts.ts";
+import { db } from "../persistence/auth.ts";
+import { QueueManager, queueEvents } from "../application/queue.ts";
+import { EffectManager } from "../application/effects.ts";
+import { ArtifactManager } from "../persistence/artifacts.ts";
 import { NotificationManager, notificationEvents } from "./notifications.ts";
 import { EmailManager } from "./email.ts";
 

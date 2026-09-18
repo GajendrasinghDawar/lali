@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { db } from "./auth.ts";
-import { QueueManager } from "./queue.ts";
+import { db } from "../persistence/auth.ts";
+import { QueueManager } from "../application/queue.ts";
 // Assuming initTelegram calls processDeliveries and startTelegramPolling
-import { initTelegram, sendTelegramMessage } from "./telegram.ts";
+import { initTelegram, sendTelegramMessage } from "../integrations/telegram.ts";
 
-vi.mock("./queue.ts", () => ({
+vi.mock("../application/queue.ts", () => ({
   QueueManager: {
     submitRequest: vi.fn(),
   },

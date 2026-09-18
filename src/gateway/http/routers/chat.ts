@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { QueueManager, sseEmitters } from "../queue.ts";
+import { QueueManager, sseEmitters } from "../../application/queue.ts";
 
 export const ChatRouter = Router();
 

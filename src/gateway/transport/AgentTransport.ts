@@ -1,7 +1,7 @@
 import * as net from "net";
 import * as os from "os";
-import { AgentEventSchema } from "../shared/protocol.ts";
-import type { AgentEvent } from "../shared/protocol.ts";
+import { AgentEventSchema } from "../../shared/protocol.ts";
+import type { AgentEvent } from "../../shared/protocol.ts";
 
 export interface AgentTransport {
   sendCommand(command: any): Promise<void>;

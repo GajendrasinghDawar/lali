@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { ArtifactManager, MAX_FILE_SIZE } from "./artifacts.ts";
-import { db } from "./auth.ts";
+import { ArtifactManager, MAX_FILE_SIZE } from "../persistence/artifacts.ts";
+import { db } from "../persistence/auth.ts";
 import fs from "fs";
 import path from "path";
 

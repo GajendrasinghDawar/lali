@@ -1,4 +1,4 @@
-import { db } from "./auth.ts";
+import { db } from "../persistence/auth.ts";
 import crypto from "crypto";
 import { NotificationManager } from "./notifications.ts";
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { db } from "./auth.ts";
-import { NotificationManager } from "./notifications.ts";
+import { db } from "../persistence/auth.ts";
+import { NotificationManager } from "../integrations/notifications.ts";
 
 describe("Notifications", () => {
   beforeEach(() => {

@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
-import { app } from './server.ts';
-import { db } from "./auth.ts";
-import { QueueManager } from "./queue.ts";
-import { EffectManager } from "./effects.ts";
+import { app } from '../http/server.ts';
+import { db } from "../persistence/auth.ts";
+import { QueueManager } from "../application/queue.ts";
+import { EffectManager } from "../application/effects.ts";
+import { AgentEventSchema } from "../../shared/protocol.ts";
 
-vi.mock("./auth.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./auth.ts")>();
+vi.mock("../persistence/auth.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../persistence/auth.ts")>();
   return {
     ...actual,
     auth: {
@@ -127,8 +128,7 @@ describe("Gateway API", () => {
     expect(req).toBeDefined();
   });
 
-  it("prevents Agent from approving effects or calling arbitrary operations", async () => {
-    const { AgentEventSchema } = await import("../shared/protocol.ts");
+  it("prevents Agent from approving effects or calling arbitrary operations", () => {
     expect(() => AgentEventSchema.parse({ type: "approve_effect" })).toThrow();
   });
 });

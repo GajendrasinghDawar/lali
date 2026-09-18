@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { db } from "./auth.ts";
-import { EffectManager } from "./effects.ts";
+import { db } from "../persistence/auth.ts";
+import { EffectManager } from "../application/effects.ts";
 import crypto from "crypto";
 
 describe("EffectManager", () => {

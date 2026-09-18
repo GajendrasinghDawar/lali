@@ -1,9 +1,9 @@
 import express, { Router } from "express";
 import crypto from "crypto";
 import path from "path";
-import { QueueManager } from "../queue.ts";
-import { ArtifactManager } from "../artifacts.ts";
-import { ScheduledJobsManager } from "../scheduled_jobs.ts";
+import { QueueManager } from "../../application/queue.ts";
+import { ArtifactManager } from "../../persistence/artifacts.ts";
+import { ScheduledJobsManager } from "../../integrations/scheduled_jobs.ts";
 
 export const MiscRouter = Router();
 

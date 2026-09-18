@@ -9,9 +9,9 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import url from "node:url";
 
-import { auth, checkAuthHealth, checkDbHealth } from "./auth.ts";
+import { auth, checkAuthHealth, checkDbHealth } from "../persistence/auth.ts";
 import { toNodeHandler } from "better-auth/node";
-import { initNotifications } from "./notifications.ts";
+import { initNotifications } from "../integrations/notifications.ts";
 
 import { SessionRouter } from "./routers/session.ts";
 import { ChatRouter } from "./routers/chat.ts";
@@ -20,10 +20,10 @@ import { NotificationRouter } from "./routers/notification.ts";
 import { EmailRouter } from "./routers/email.ts";
 import { MiscRouter } from "./routers/misc.ts";
 
-import { initTelegram } from "./telegram.ts";
-import { runMigrations } from "./schema.ts";
-import { startupCleanup, startRetentionCron } from "./startup_cleanup.ts";
-import { ScheduledJobsManager } from "./scheduled_jobs.ts";
+import { initTelegram } from "../integrations/telegram.ts";
+import { runMigrations } from "../persistence/schema.ts";
+import { startupCleanup, startRetentionCron } from "../persistence/startup_cleanup.ts";
+import { ScheduledJobsManager } from "../integrations/scheduled_jobs.ts";
 
 const app = express();
 initNotifications();
@@ -110,9 +110,9 @@ app.use("/api/emails", doubleCsrfProtection, apiLimiter, EmailRouter);
 app.use("/api", doubleCsrfProtection, apiLimiter, MiscRouter);
 
 // SPA fallback for Web UI
-app.use(express.static(path.join(import.meta.dirname, "../../dist/web")));
+app.use(express.static(path.join(import.meta.dirname, "../../../dist/web")));
 app.use((req, res) => {
-  res.sendFile(path.join(import.meta.dirname, "../../dist/web/index.html"));
+  res.sendFile(path.join(import.meta.dirname, "../../../dist/web/index.html"));
 });
 
 export { app };

@@ -1,5 +1,5 @@
-import { db } from "./auth.ts";
-import { QueueManager, queueEvents } from "./queue.ts";
+import { db } from "../persistence/auth.ts";
+import { QueueManager, queueEvents } from "../application/queue.ts";
 import { NotificationManager } from "./notifications.ts";
 import crypto from "crypto";
 

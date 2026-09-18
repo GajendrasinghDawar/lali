@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { db } from "../auth.ts";
-import { QueueManager } from "../queue.ts";
-import { EffectManager } from "../effects.ts";
+import { db } from "../../persistence/auth.ts";
+import { QueueManager } from "../../application/queue.ts";
+import { EffectManager } from "../../application/effects.ts";
 
 export const EffectRouter = Router();
 

@@ -19,13 +19,13 @@ A durable, Pi-powered personal assistant gateway. Accepts messages from Web and 
                  ╰──────────────╯
 ```
 
-**Gateway** (`src/gateway/server.ts`) -- Express server. Serves the Web UI, manages auth, persists operational state in SQLite (`gateway.db`), relays messages to the Agent, delivers notifications, and executes approved effects (email, GitHub).
+**Gateway** (`src/gateway/http/server.ts`) -- Express server. Serves the Web UI, manages auth, persists operational state in SQLite (`gateway.db`), relays messages to the Agent, delivers notifications, and executes approved effects (email, GitHub).
 
 **Agent** (`src/agent/server.ts`) -- Listens on a Unix socket. Validates requests via Zod. Forwards them to the Pi SDK session. Currently uses a deterministic fake model (`src/agent/pi.ts`).
 
 **Web UI** (`src/web/index.html`) -- Chat interface with SSE streaming, effect approval buttons, notification inbox, and email inbox.
 
-**Telegram** (`src/gateway/telegram.ts`) -- Long-polls for owner messages, queues them as durable requests, delivers notifications with inline approve/reject buttons.
+**Telegram** (`src/gateway/integrations/telegram.ts`) -- Long-polls for owner messages, queues them as durable requests, delivers notifications with inline approve/reject buttons.
 
 ---
 

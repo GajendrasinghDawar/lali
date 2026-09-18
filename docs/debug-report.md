@@ -7,9 +7,9 @@ This document summarizes the root causes and solutions for the series of bugs th
 **Symptoms:** Messages sent from the frontend did not receive a response. Database inspection revealed requests were permanently stuck in the `running` state, blocking all subsequent queued requests.
 
 **Root Cause A: TCP Stream Chunking Bug (The "Silent Drop")**
-When the agent sent JSON messages over the named pipe (`\\.\pipe\lali-agent`), the gateway server read the data in chunks. The parsing logic in `src/gateway/queue.ts` incorrectly used `buffer.split("\\n")` (a literal backslash followed by 'n') instead of the actual newline character `buffer.split("\n")`. 
+When the agent sent JSON messages over the named pipe (`\\.\pipe\lali-agent`), the gateway server read the data in chunks. The parsing logic in `src/gateway/application/queue.ts` incorrectly used `buffer.split("\\n")` (a literal backslash followed by 'n') instead of the actual newline character `buffer.split("\n")`. 
 Because TCP data arrives in arbitrary chunks, this caused the gateway to attempt to `JSON.parse` incomplete fragments of the JSON payload. The gateway swallowed the resulting syntax errors and dropped the messages—crucially dropping the final `{"type": "done"}` event. Without this event, the gateway never marked the request as `completed` in the database.
-* **Solution:** Corrected the delimiter to `\n` in `src/gateway/queue.ts`, ensuring complete JSON objects are reconstructed before parsing.
+* **Solution:** Corrected the delimiter to `\n` in `src/gateway/application/queue.ts`, ensuring complete JSON objects are reconstructed before parsing.
 
 **Root Cause B: Stale Shell Environment Variables**
 The agent process in `src/agent/pi.ts` used `process.loadEnvFile()` to load configuration. However, Node's `loadEnvFile()` does not overwrite environment variables that are already exported in the active shell. The shell running the server had a stale `AZURE_OPENAI_BASE_URL` (`https://gajen-m8ujm03o-swedencentral...`) lingering in its memory, which overrode the correct Serverless endpoint (`https://princ-msg6fgey-southeastasia...`) defined in `.env`.
@@ -21,7 +21,7 @@ The Azure Serverless endpoint provided was designed to be a drop-in replacement 
 
 ## 2. Gateway Server Crashing on Restart
 
-**Symptoms:** Starting or restarting the gateway server (`src/gateway/server.ts`) caused a fatal crash in `src/gateway/startup_cleanup.ts`: `Error: NOT NULL constraint failed: session_state.userId`.
+**Symptoms:** Starting or restarting the gateway server (`src/gateway/http/server.ts`) caused a fatal crash in `src/gateway/persistence/startup_cleanup.ts`: `Error: NOT NULL constraint failed: session_state.userId`.
 
 **Root Cause:**
 On startup, the server attempts to find any interrupted requests and mark their associated sessions as paused. It did this using an `INSERT INTO session_state ... ON CONFLICT DO UPDATE` query. However, the `session_state` table enforces a `NOT NULL` constraint on the `userId` column. In SQLite, the `INSERT` portion of an `ON CONFLICT` clause is evaluated first. Since `userId` was omitted from the query, the constraint failed before the `ON CONFLICT` fallback could trigger.

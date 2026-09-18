@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
-import { TcpAgentTransport } from "./AgentTransport.ts";
-import { SqliteSessionStore } from "./SessionStore.ts";
+import { TcpAgentTransport } from "../transport/AgentTransport.ts";
+import { SqliteSessionStore } from "../persistence/SessionStore.ts";
 import { SessionOrchestrator } from "./SessionOrchestrator.ts";
 import { effectEvents } from "./effects.ts";
 

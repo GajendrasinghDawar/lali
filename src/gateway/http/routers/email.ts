@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { db } from "../auth.ts";
-import { QueueManager } from "../queue.ts";
-import { EmailManager } from "../email.ts";
+import { db } from "../../persistence/auth.ts";
+import { QueueManager } from "../../application/queue.ts";
+import { EmailManager } from "../../integrations/email.ts";
 
 type EmailRow = {
   id: string;

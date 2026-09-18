@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { QueueManager } from "../queue.ts";
-import { NotificationManager } from "../notifications.ts";
+import { QueueManager } from "../../application/queue.ts";
+import { NotificationManager } from "../../integrations/notifications.ts";
 
 export const NotificationRouter = Router();
 

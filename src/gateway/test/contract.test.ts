@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import request from "supertest";
-import { app } from "./server.ts";
-import { QueueManager } from "./queue.ts";
-import { EffectManager } from "./effects.ts";
-import { db } from "./auth.ts";
+import { app } from "../http/server.ts";
+import { QueueManager } from "../application/queue.ts";
+import { EffectManager } from "../application/effects.ts";
+import { db } from "../persistence/auth.ts";
 
 describe("Gateway Contract (Phase 0)", () => {
   it("emits user_message in timeline when a request is submitted", async () => {
